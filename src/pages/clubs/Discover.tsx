@@ -10,6 +10,11 @@ import { ChipGroup, EmptyState, PageHeader, SampleBadge, SearchInput } from '../
 import { useTitle } from '../../hooks/useTitle';
 
 type Show = 'all' | 'following' | 'not';
+
+/** Lower-cased search text per organization, built once instead of on every keystroke. */
+const HAYSTACK = new Map(
+  CLUBS.map((c) => [c.id, [c.name, c.summary, c.about, c.category, c.location ?? '', c.scheduleNote ?? '', ...c.tags].join(' ').toLowerCase()]),
+);
 type Process = 'any' | 'required' | 'open' | 'unknown';
 type Sort = 'name' | 'name-desc';
 
@@ -40,7 +45,7 @@ export default function Discover() {
       if (show === 'following' && !f) return false;
       if (show === 'not' && f) return false;
       if (process !== 'any' && (c.application?.process ?? 'unknown') !== process) return false;
-      const hay = [c.name, c.summary, c.about, c.category, c.location ?? '', c.scheduleNote ?? '', ...c.tags].join(' ').toLowerCase();
+      const hay = HAYSTACK.get(c.id) ?? '';
       return terms.every((t) => hay.includes(t));
     }).sort((a, b) => (sort === 'name-desc' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)));
   }, [q, cat, show, sort, process, followed]);

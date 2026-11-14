@@ -110,7 +110,11 @@ const ls = (k) => JSON.parse(localStorage.getItem(k) ?? 'null');
 
 async function evalIn(call, expr) {
   const r = await call('Runtime.evaluate', { expression: `(async () => { ${HELPERS}\n${expr} })()`, awaitPromise: true, returnByValue: true });
-  if (r.result?.exceptionDetails) throw new Error(r.result.exceptionDetails.exception?.description ?? r.result.exceptionDetails.text);
+  if (r.result?.exceptionDetails) {
+    const d = r.result.exceptionDetails;
+    // First line of the error plus the start of the failing expression, so a crash names its step.
+    throw new Error(`${String(d.exception?.description ?? d.text).split('\n')[0]} — in: ${expr.slice(0, 140)}`);
+  }
   return r.result?.result?.value;
 }
 const ev = (expr) => evalIn(send, expr);
@@ -122,10 +126,15 @@ async function waitFor(expr, timeout = 4000, call = send) {
   }
   return false;
 }
-const ready = `document.readyState === 'complete' && document.querySelector('main h1, main h2')`;
-async function goto(path, call = send) { await call('Page.navigate', { url: BASE + path }); await sleep(150); await waitFor(ready, 4000, call); await sleep(100); }
-async function reload() { await send('Page.reload', {}); await sleep(200); await waitFor(ready); await sleep(100); }
-async function click(expr, settle = 180, call = send) { await evalIn(call, `const el = ${expr}; if (!el) throw new Error('not found: ' + ${JSON.stringify(expr)}); el.click(); return true`); await sleep(settle); }
+// Resolves once the DOM has been quiet for a moment (capped): waits for React to finish, not for a fixed time.
+const QUIET = `await new Promise((res) => { let t; const loading = () => [...document.querySelectorAll('[role=status]')].some((e) => e.textContent.trim() === 'Loading…'); const done = (force) => { if (!force && loading()) { t = setTimeout(done, 60); return; } obs.disconnect(); clearTimeout(t); clearTimeout(cap); res(true); }; const obs = new MutationObserver(() => { clearTimeout(t); t = setTimeout(done, 120); }); obs.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true }); t = setTimeout(done, 120); const cap = setTimeout(() => done(true), 8000); }); return true`;
+async function settle(call = send) { try { await evalIn(call, QUIET); } catch {} }
+// Ready = the new document (the old one is marked before navigating), a page heading, and no lazy-loading placeholder.
+const ready = `document.readyState === 'complete' && !window.__leaving && document.querySelector('main h1, main h2') && ![...document.querySelectorAll('main [role=status]')].some((e) => e.textContent.trim() === 'Loading…')`;
+const markLeaving = (call) => evalIn(call, 'window.__leaving = true; return true').catch(() => {});
+async function goto(path, call = send) { await markLeaving(call); await call('Page.navigate', { url: BASE + path }); await waitFor(ready, 8000, call); await settle(call); }
+async function reload() { await markLeaving(send); await send('Page.reload', {}); await waitFor(ready, 8000); await settle(); }
+async function click(expr, _legacy, call = send) { await evalIn(call, `const el = ${expr}; if (!el) throw new Error('not found: ' + ${JSON.stringify(expr)}); el.click(); return true`); await settle(call); }
 const path = () => ev(`return location.pathname + location.search`);
 async function viewport(width, height = 900) { await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 768 }); }
 async function shot(name) { const r = await send('Page.captureScreenshot', { format: 'png' }); writeFileSync(join(OUT, `${name}.png`), Buffer.from(r.result.data, 'base64')); }
@@ -135,7 +144,7 @@ await viewport(1440);
 await goto('/');
 await ev(`localStorage.clear(); return true`);
 
-const esc = async () => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await sleep(200); };
+const esc = async () => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await settle(); };
 const view = (v) => `byText('[aria-label="Calendar view"] button', ${JSON.stringify(v)})`;
 const chips = (t) => `$$('main button[aria-label]').filter(b => b.getAttribute('aria-label').startsWith(${JSON.stringify(t + '.')}))`;
 const labels = (t) => ev(`return ${chips(t)}.map(b => b.getAttribute('aria-label'))`);
@@ -148,7 +157,7 @@ const profileFollow = `$('main header button[aria-pressed]')`;
 // 1. Search
 await section('1 Search', async () => {
   await goto('/clubs/discover');
-  const search = async (q) => { await ev(`typeInto($('main input[type=search]'), ${JSON.stringify(q)}); return true`); await sleep(150); return ev(`return cardTitles()`); };
+  const search = async (q) => { await ev(`typeInto($('main input[type=search]'), ${JSON.stringify(q)}); return true`); await settle(); return ev(`return cardTitles()`); };
   let n = await search('robot');
   check('1 Search', 'name match "robot"', JSON.stringify(n) === '["UMass Robotics Club"]', n);
   check('1 Search', 'query stored in URL', (await path()).includes('q=robot'));
@@ -177,7 +186,7 @@ await section('2 Category', async () => {
   let n = (await ev(`return cardTitles()`)).sort();
   check('2 Category', 'Engineering → 3 correct clubs', JSON.stringify(n) === JSON.stringify(['3D Printing Club', 'Engineers Without Borders', 'UMass Robotics Club']), n);
   check('2 Category', 'chip aria-pressed', await ev(`return ${chip('Engineering')}.getAttribute('aria-pressed') === 'true'`));
-  await ev(`typeInto($('main input[type=search]'), 'printers'); return true`); await sleep(150);
+  await ev(`typeInto($('main input[type=search]'), 'printers'); return true`); await waitFor(`cardTitles().length === 1`, 4000);
   n = await ev(`return cardTitles()`);
   check('2 Category', 'category + search combine', JSON.stringify(n) === '["3D Printing Club"]', n);
   await ev(`typeInto($('main input[type=search]'), ''); return true`); await waitFor(`cardTitles().length > 1`, 4000);
@@ -223,7 +232,7 @@ await section('4 Profile', async () => {
   check('4 Profile', '"All organizations" link keeps filters', (await path()) === '/clubs/discover?cat=Technology', await path());
   await click(`card('Women in Cybersecurity at UMass Amherst').querySelector('a.btn')`);
   check('4 Profile', '"View profile" button opens profile', (await path()) === '/clubs/discover/womenincybersecurity');
-  await ev(`history.back(); return true`); await sleep(250);
+  await ev(`history.back(); return true`); await waitFor(`location.pathname === '/clubs/discover'`, 4000); await settle();
   check('4 Profile', 'browser Back keeps filters', (await path()) === '/clubs/discover?cat=Technology', await path());
   await goto('/clubs/discover/chessclub');
   check('4 Profile', 'verified schedule shown with next meeting', await ev(`const t = $('main').textContent; return t.includes('Mondays') && t.includes('Thursdays') && t.includes('6:00 – 9:00 PM') && t.includes('Next meeting') && t.includes('Blue Wall')`));
@@ -321,7 +330,7 @@ await section('8 Save', async () => {
   check('9 Saved views', 'week navigation (day-8 event in next week)', !w0 && w1, `w0=${w0} w1=${w1}`);
 
   await goto('/clubs/events?src=sample');
-  await ev(`typeInto($('main input[type=search]'), 'pizza'); return true`); await sleep(150);
+  await ev(`typeInto($('main input[type=search]'), 'pizza'); return true`); await waitFor(`cardTitles().length < 5`, 4000);
   let r = await ev(`return cardTitles()`);
   check('8 Save', 'event search "pizza"', JSON.stringify(r) === '["Intro to Hackathons Workshop"]', r);
   await ev(`typeInto($('main input[type=search]'), ''); return true`); await waitFor(`cardTitles().length > 1`, 4000);
@@ -428,8 +437,8 @@ await section('10 Nav', async () => {
   await viewport(375, 812);
   await goto('/');
   const burger = `$('button[aria-label="Open global navigation"]')`;
-  const openDrawer = async () => { await ev(`${burger}.focus(); ${burger}.click(); return true`); await sleep(250); };
-  const key = async (k, code, vk) => { await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: k, code, windowsVirtualKeyCode: vk }); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }); await sleep(40); };
+  const openDrawer = async () => { await ev(`${burger}.focus(); ${burger}.click(); return true`); await waitFor(`$('#mobile-nav').open`, 3000); await settle(); };
+  const key = async (k, code, vk) => { await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: k, code, windowsVirtualKeyCode: vk }); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }); await settle(); };
   await openDrawer();
   check('10 Nav', 'mobile drawer opens as modal', await ev(`return $('#mobile-nav').open && $('#mobile-nav').matches(':modal')`));
   check('10 Nav', 'drawer moves focus inside', await ev(`return $('#mobile-nav').contains(document.activeElement)`));
@@ -443,7 +452,7 @@ await section('10 Nav', async () => {
   }
   check('10 Nav', `Tab cycles inside drawer (${visited.size} stops)`, escaped === 0 && visited.size >= 10, `escaped=${escaped}`);
   await key('Escape', 'Escape', 27);
-  await sleep(150);
+  await waitFor(`!$('#mobile-nav').open`, 3000);
   check('10 Nav', 'Escape closes drawer', !(await ev(`return $('#mobile-nav').open`)));
   check('10 Nav', 'focus returns to menu button', await ev(`return document.activeElement === ${burger}`));
   await openDrawer();
@@ -733,7 +742,7 @@ await section('17 Sync', async () => {
   await click(`byText('main button', 'Post review')`);
   check('S Sync', 'review in tab A appears in tab B', await inB(`$('main').textContent.includes('Sync test review from tab A.')`));
   await ev(`localStorage.setItem('myclubs:followed', '{"broken":'); return true`);
-  await sleep(500);
+  await settle(b.call);
   check('S Sync', 'corrupted write from another tab ignored safely', await evalIn(b.call, `return !!$('main h1') && $('main').textContent.includes('Active Minds')`));
   b.sock.close();
   await fetch(`http://127.0.0.1:${PORT}/json/close/${tab.id}`).catch(() => {});
@@ -763,7 +772,7 @@ await section('19 Demo', async () => {
   await ev(`localStorage.clear(); return true`);
   await goto('/clubs/discover');
   await ev(`typeInto($('main input[type=search]'), 'chess'); return true`);
-  await sleep(200);
+  await waitFor(`cardTitles().length < 5`, 4000);
   check('Z Demo', 'search finds Chess Club', JSON.stringify(await ev(`return cardTitles()`)) === '["Chess Club"]');
   await goto('/clubs/fit');
   const group = (s) => ev(`const g = $('#group-${s}'); return g.tagName === 'DETAILS' ? $$('li[data-club]', g).map(li => li.querySelector('a').textContent.trim()) : $$('h3 a', g.closest('section')).map(a => a.textContent.trim())`);
@@ -920,13 +929,13 @@ await section('21 Application forms', async () => {
 
   // 5. Résumé validation, drag-and-drop, replace/remove, sample, IndexedDB only.
   await setFile('notes.docx', `'hello'`, 'application/msword');
-  await sleep(300);
+  await waitFor(`$$('main [role=alert]').length`, 3000);
   check(A, 'résumé: non-PDF rejected', await ev(`return [...$$('main [role=alert]')].some(e => e.textContent.includes("isn't a PDF"))`));
   await setFile('huge.pdf', 'new Uint8Array(6 * 1024 * 1024)', 'application/pdf');
-  await sleep(400);
+  await waitFor(`[...$$('main [role=alert]')].some(e => e.textContent.includes('MB'))`, 3000);
   check(A, 'résumé: over 5 MB rejected', await ev(`return [...$$('main [role=alert]')].some(e => e.textContent.includes('under 5 MB'))`));
   await setFile('fake.pdf', `'not really a pdf'`, 'application/pdf');
-  await sleep(300);
+  await waitFor(`[...$$('main [role=alert]')].some(e => e.textContent.includes('fake.pdf'))`, 3000);
   check(A, 'résumé: fake PDF rejected', await ev(`return [...$$('main [role=alert]')].some(e => e.textContent.includes("doesn't look like a valid PDF")) && !$('[data-testid=resume-attached]')`));
   await ev(`const dt = new DataTransfer(); dt.items.add(new File(['%PDF-1.4 my resume'], 'my-resume.pdf', { type: 'application/pdf' })); $('[data-testid=resume-drop]').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })); return true`);
   await waitFor(`$('[data-testid=resume-attached]')`);
@@ -1027,7 +1036,7 @@ await section('21 Application forms', async () => {
   // Removing an application deletes its résumé.
   await goto('/clubs/applications');
   await click(`byText('main button', 'Remove Campus Builders Collective')`);
-  await sleep(300);
+  for (let i = 0; i < 20 && (await idbResume('demo-org')) !== null; i++) await sleep(100);
   check(A, 'removing the application deletes its résumé', (await idbResume('demo-org')) === null && (await ev(`return !ls('myclubs:applications').some(a => a.clubId === 'demo-org')`)));
   check(A, 'demo callout returns after removal', await ev(`return !!$('#demo-app')`));
 
@@ -1104,7 +1113,7 @@ await section('22 Reliability', async () => {
   check(A, 'newer answers from tab A are kept', (await stored('demo-org'))?.form?.values?.major === 'Edited in tab A');
   check(A, 'tab B save state says not saved', await evB(`return $('[data-testid=save-state]').textContent.includes('changed in another tab')`));
   await evalIn(b.call, `byText('main button', "Keep this tab's version").click(); return true`);
-  await sleep(150);
+  await waitFor(`ls('myclubs:applications').find((a) => a.clubId === 'demo-org').form.values.major === 'Edited in tab B'`, 3000);
   check(A, "keep this tab's version writes it deliberately", (await stored('demo-org'))?.form?.values?.major === 'Edited in tab B');
   check(A, 'tab A (no unsaved edits) loads the newer version automatically', await waitFor(`$('#f-major').value === 'Edited in tab B' && $('[data-testid=form-notice]')?.textContent.includes('another tab')`, 3000));
   // Conflict resolved the other way: load the other tab's version.
@@ -1120,7 +1129,7 @@ await section('22 Reliability', async () => {
   await ev(`typeInto($('#f-fullName'), 'Tab A on demo'); return true`);
   await click(`byText('main button', 'Save draft')`);
   await evalIn(b.call, `byText('main button', 'Save draft').click(); return true`);
-  await sleep(200);
+  await waitFor(`ls('myclubs:applications').some((a) => a.clubId === 'bestbuddies' && a.form?.values?.fullName === 'Tab B on Best Buddies')`, 3000);
   check(A, 'separate applications edited at once: both kept, no warning', (await stored('demo-org'))?.form?.values?.fullName === 'Tab A on demo' && (await stored('bestbuddies'))?.form?.values?.fullName === 'Tab B on Best Buddies' && !(await evB(`return !!$('[data-testid=conflict]')`)) && !(await ev(`return !!$('[data-testid=conflict]')`)));
   b.sock.close();
   await fetch(`http://127.0.0.1:${PORT}/json/close/${tab.id}`).catch(() => {});
@@ -1158,11 +1167,16 @@ await section('22 Reliability', async () => {
   // IndexedDB blocked: no crash, honest warning, text drafts still saved, retry and remove.
   await ev(`Object.defineProperty(window, 'indexedDB', { configurable: true, get: () => ({ open() { const r = {}; setTimeout(() => r.onerror && r.onerror(), 0); return r; } }) }); return true`);
   await setFile('offline-resume.pdf', `'%PDF-1.4 OFFLINE'`);
-  await waitFor(`$('[data-testid=resume-memory-only]')`, 6000);
-  check(A, "IndexedDB failure: warns the file won't survive a refresh", await ev(`const t = $('[data-testid=resume-memory-only]').textContent; return t.includes("can't store files") && t.includes('gone after a refresh') && $('[data-testid=resume-attached]').textContent.includes('this visit only')`));
+  const memOnly = await waitFor(`$('[data-testid=resume-memory-only]')`, 8000);
+  check(
+    A,
+    "IndexedDB failure: warns the file won't survive a refresh",
+    memOnly && (await ev(`const t = $('[data-testid=resume-memory-only]').textContent; return t.includes("can't store files") && t.includes('gone after a refresh') && $('[data-testid=resume-attached]')?.textContent.includes('this visit only')`)),
+    memOnly ? '' : await ev(`return location.pathname + ' | ' + ($('#step-heading')?.textContent ?? '-') + ' | ' + [...$$('main [role=alert], main [role=status]')].map((e) => e.textContent).join(' / ').slice(0, 300)`),
+  );
   check(A, 'IndexedDB failure: no stored résumé is claimed', (await stored('demo-org'))?.form?.resume === undefined);
   await ev(`typeInto($('#f-portfolio'), 'alex.dev'); return true`);
-  await sleep(700);
+  await waitFor(`$('[data-testid=save-state]').textContent.startsWith('Saved')`, 3000);
   check(A, 'IndexedDB failure: text answers still save', (await stored('demo-org'))?.form?.values?.portfolio === 'https://alex.dev');
   await click(`byText('[data-testid=resume-memory-only] button', 'Try saving again')`);
   check(A, 'retry reports it still failed', await waitFor(`[...$$('main [role=alert]')].some(e => e.textContent.includes("Still couldn't save"))`, 6000));
@@ -1342,7 +1356,7 @@ await section('23 Application features', async () => {
   // Delete the profile: profile and default résumé go; applications keep their answers.
   await goto('/clubs/applications/profile');
   await click(`byText('main button', 'Delete profile')`);
-  await sleep(300);
+  for (let i = 0; i < 20 && (await idb('__default__')) !== null; i++) await sleep(100);
   check(A, 'delete profile removes it and the default résumé', (await ev(`return ls('myclubs:profile')`)) === null && (await idb('__default__')) === null);
   check(A, 'applications keep their own answers after profile deletion', (await stored('bestbuddies'))?.form?.values?.fullName === 'Jordan L.');
 
