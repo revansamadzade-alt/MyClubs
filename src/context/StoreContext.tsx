@@ -5,7 +5,7 @@ import { useToast } from './ToastContext';
 import { CLUB_BY_ID } from '../data/clubs';
 import { EVENT_BY_ID } from '../data/events';
 
-/** Demo defaults so My Clubs and My Campus Life have content on first load. */
+/** Demo defaults so My Clubs & Associations and My Campus Life have content on first load. */
 const SEED_FOLLOWED = ['chessclub', 'roboticsclub'];
 const SEED_SAVED = ['ev-career-fair', 'ev-acappella'];
 

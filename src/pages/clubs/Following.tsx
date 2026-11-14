@@ -10,7 +10,7 @@ import { CategoryTag, ClubAvatar, EmptyState, PageHeader, SaveEventButton } from
 import { useTitle } from '../../hooks/useTitle';
 
 export default function Following() {
-  useTitle('My Clubs');
+  useTitle('My Clubs & Associations');
   const { followed, toggleFollow } = useStore();
   const clubs = followed.map((id) => CLUB_BY_ID[id]).filter((c): c is Club => !!c);
   const upcoming = upcomingForClubs(followed, 14).slice(0, 12);
@@ -18,7 +18,7 @@ export default function Following() {
   if (!clubs.length) {
     return (
       <>
-        <PageHeader title="My Clubs" />
+        <PageHeader title="My Clubs & Associations" />
         <EmptyState
           icon={UsersRound}
           title="You're not following any clubs yet"
@@ -37,7 +37,7 @@ export default function Following() {
   return (
     <>
       <PageHeader
-        title="My Clubs"
+        title="My Clubs & Associations"
         description={
           <>
             You follow <strong className="text-ink">{clubs.length}</strong> club{clubs.length === 1 ? '' : 's'}.

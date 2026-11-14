@@ -235,7 +235,7 @@ await section('4 Profile', async () => {
 await section('5 Follow', async () => {
   await goto('/clubs/discover');
   const btn = (t) => `card(${JSON.stringify(t)}).querySelector('button[aria-pressed]')`;
-  const navCount = `(($('#clubs-nav').textContent.match(/My Clubs(\\d+)/) || [])[1] || '0')`;
+  const navCount = `(($('#clubs-nav').textContent.match(/My Clubs & Associations(\\d+)/) || [])[1] || '0')`;
   await click(btn('Vocal Suspects'));
   check('5 Follow', 'Follow → pressed + "Following"', await ev(`const b = ${btn('Vocal Suspects')}; return b.getAttribute('aria-pressed') === 'true' && b.textContent.includes('Following')`));
   check('5 Follow', 'toast announced', await ev(`return $('[role=status]').textContent.includes('Following Vocal Suspects')`));
@@ -400,8 +400,9 @@ await section('10 Nav', async () => {
   await click(`byText('nav[aria-label="Global navigation"] a', 'MyClubs')`);
   await waitFor(`location.pathname === '/clubs/discover'`);
   check('10 Nav', 'global MyClubs → /clubs/discover', (await path()) === '/clubs/discover');
-  for (const [label, p, h1] of [['My Clubs', '/clubs/following', 'My Clubs'], ['Campus Events', '/clubs/events', 'Campus Events'], ['My Campus Life', '/clubs/campus-life', 'My Campus Life'], ['Discover', '/clubs/discover', 'Discover Student Organizations']]) {
+  for (const [label, p, h1] of [['My Clubs & Associations', '/clubs/following', 'My Clubs & Associations'], ['Campus Events', '/clubs/events', 'Campus Events'], ['My Campus Life', '/clubs/campus-life', 'My Campus Life'], ['Discover', '/clubs/discover', 'Discover Student Organizations']]) {
     await click(`byText('#clubs-nav a', ${JSON.stringify(label)})`);
+    await waitFor(`$('main h1')?.textContent.trim() === ${JSON.stringify(h1)}`);
     const ok = (await path()) === p && (await ev(`return $('main h1').textContent.trim() === ${JSON.stringify(h1)} && byText('#clubs-nav a', ${JSON.stringify(label)}).getAttribute('aria-current') === 'page' && byText('nav[aria-label="Global navigation"] a', 'MyClubs').getAttribute('aria-current') === 'page'`));
     check('10 Nav', `side nav → ${label} (+active states)`, ok, await path());
   }
@@ -611,6 +612,7 @@ await section('15 Find My Fit', async () => {
   await click(`byText('nav[aria-label="Global navigation"] a', 'MyClubs')`);
   await waitFor(`location.pathname === '/clubs/discover'`);
   await click(`byText('main a', 'Find My Fit')`);
+  await waitFor(`$('#group-fits') && $('#group-unknown')`);
   check('F Fit', 'Discover "Find My Fit" button opens page', (await path()) === '/clubs/fit', await path());
   check('F Fit', 'section nav marks Find My Fit active', await ev(`return byText('#clubs-nav a', 'Find My Fit').getAttribute('aria-current') === 'page'`));
   check('F Fit', 'demo class schedule labeled', await ev(`return $('main').textContent.includes('Demo class schedule') && /\\d+ class sessions/.test($('main').textContent)`));

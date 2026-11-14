@@ -23,7 +23,7 @@ calendar that flags real time conflicts.
 - **Discover** — 78 real UMass organizations with search, category filters, sorting and source-linked profiles.
 - **Campus Events** — 388 verified events from the public Campus Pulse and UMass Events Calendar feeds (official
   links, host club when known, deduplicated across sources), paged for speed, plus clearly labeled sample events.
-- **My Clubs** — follow/unfollow (tracking only, not membership), upcoming activity, persistence in `localStorage`
+- **My Clubs & Associations** — follow/unfollow (tracking only, not membership), upcoming activity, persistence in `localStorage`
   that stays in sync across open tabs.
 - **Canvas-style shell** — dashboard, global navigation and To Do panel matched to the real Canvas layout.
 

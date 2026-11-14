@@ -10,7 +10,7 @@ import { cx } from '../../lib/cx';
 const SECTIONS = [
   { to: '/clubs/discover', label: 'Discover' },
   { to: '/clubs/fit', label: 'Find My Fit' },
-  { to: '/clubs/following', label: 'My Clubs', count: 'followed' as const },
+  { to: '/clubs/following', label: 'My Clubs & Associations', count: 'followed' as const },
   { to: '/clubs/events', label: 'Campus Events', count: 'saved' as const },
   { to: '/clubs/campus-life', label: 'My Campus Life' },
 ];
