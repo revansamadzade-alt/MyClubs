@@ -73,6 +73,13 @@ export function FollowButton({ club, size }: { club: Club; size?: 'sm' }) {
 export function SaveEventButton({ event, size }: { event: CampusEvent; size?: 'sm' }) {
   const { isSaved, toggleSave } = useStore();
   const saved = isSaved(event.id);
+  if (event.end <= new Date() && !saved) {
+    return (
+      <button type="button" disabled className={cx('btn btn-secondary cursor-not-allowed opacity-60', size === 'sm' && 'btn-sm')}>
+        Ended<span className="sr-only"> — {event.title} can no longer be saved</span>
+      </button>
+    );
+  }
   return (
     <button
       type="button"

@@ -72,7 +72,12 @@ export default function ClubsLayout() {
         <button
           type="button"
           onClick={() => {
-            if (window.confirm('Reset follows, saved events and reviews to the demo defaults?')) resetDemo();
+            if (
+              window.confirm(
+                'Reset to the demo scenario? You will follow Chess Club and UMass Robotics Club, have two sample events saved, and your reviews will be cleared.',
+              )
+            )
+              resetDemo();
           }}
           className="btn btn-secondary btn-sm shrink-0"
         >

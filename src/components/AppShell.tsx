@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { GlobalNav } from './GlobalNav';
+import { addDays, dateKey, startOfDay } from '../lib/dates';
 
 function PrototypeFooter() {
   return (
@@ -14,8 +15,34 @@ function PrototypeFooter() {
   );
 }
 
+/** Local calendar date that updates at midnight and when the tab regains focus (e.g. after sleep). */
+function useLocalDate(): string {
+  const [day, setDay] = useState(() => dateKey(new Date()));
+  useEffect(() => {
+    const check = () => setDay(dateKey(new Date()));
+    const msToMidnight = () => {
+      const now = new Date();
+      return addDays(startOfDay(now), 1).getTime() - now.getTime() + 500;
+    };
+    let timer = window.setTimeout(function tick() {
+      check();
+      timer = window.setTimeout(tick, msToMidnight());
+    }, msToMidnight());
+    const onVisible = () => document.visibilityState === 'visible' && check();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', check);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', check);
+    };
+  }, []);
+  return day;
+}
+
 export function AppShell() {
   const { pathname } = useLocation();
+  const day = useLocalDate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDialogElement>(null);
 
@@ -89,8 +116,9 @@ export function AppShell() {
       </dialog>
 
       <div className="md:pl-[84px]">
-        <main id="main" tabIndex={-1} className="outline-none">
-          <Outlet />
+        <main id="main" tabIndex={-1} className="outline-none" data-day={day}>
+          {/* Remount pages when the local date changes so "today", upcoming filters and calendars refresh. */}
+          <Outlet key={day} />
         </main>
         <PrototypeFooter />
       </div>

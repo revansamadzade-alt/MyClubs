@@ -35,6 +35,7 @@ export default function ClubProfile() {
 
   const now = new Date();
   const events = EVENTS.filter((e) => e.clubId === club.id && e.end > now);
+  const pastEvents = EVENTS.filter((e) => e.clubId === club.id && e.end <= now).reverse();
   const next = nextMeeting(club);
 
   return (
@@ -102,6 +103,16 @@ export default function ClubProfile() {
                 </a>
                 .
               </p>
+            )}
+            {pastEvents.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-sm text-link">Past events ({pastEvents.length})</summary>
+                <div className="mt-2 space-y-3">
+                  {pastEvents.map((e) => (
+                    <EventCard key={e.id} event={e} compact />
+                  ))}
+                </div>
+              </details>
             )}
           </section>
 

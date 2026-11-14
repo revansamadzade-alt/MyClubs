@@ -1,4 +1,4 @@
-import type { Category, Club } from '../types';
+import type { CampusEvent, Category, Club } from '../types';
 import { CLUBS } from '../data/clubs';
 import { EVENTS } from '../data/events';
 import { addDays, startOfDay } from './dates';
@@ -17,6 +17,18 @@ export interface ClubFit {
   slots: FitSlot[];
   free: number;
   interest: boolean;
+  /** For unknown schedules: the next verified event after the window, if any. */
+  laterEvent?: CampusEvent;
+}
+
+/** Why a club has no checkable times, in plain words. Never implies a time that was not published. */
+export function unknownReason(fit: ClubFit): string {
+  if (fit.club.scheduleNote) return `Listed schedule is incomplete: ${fit.club.scheduleNote}`;
+  if (fit.laterEvent) {
+    const when = fit.laterEvent.start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return `No listed times in the next ${FIT_WINDOW_DAYS} days. Next listed event: ${when}.`;
+  }
+  return 'Campus Pulse lists no meeting times and no upcoming public events for this club.';
 }
 
 export const FIT_WINDOW_DAYS = 14;
@@ -48,7 +60,8 @@ export function findMyFit(opts: { followed: string[]; saved: string[]; interests
     const slots = items.map((item) => ({ item, overlaps: overlapsFor(item, pool) }));
     const free = slots.filter((s) => !s.overlaps.length).length;
     const status: FitStatus = !slots.length ? 'unknown' : free === slots.length ? 'fits' : free === 0 ? 'conflicts' : 'partial';
-    return { club, status, slots, free, interest: opts.interests.includes(club.category) };
+    const laterEvent = status === 'unknown' ? EVENTS.find((e) => e.clubId === club.id && e.verified && e.start >= to) : undefined;
+    return { club, status, slots, free, interest: opts.interests.includes(club.category), laterEvent };
   });
 }
 

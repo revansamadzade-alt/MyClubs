@@ -1,5 +1,5 @@
 import type { CampusEvent } from '../types';
-import { fromToday } from '../lib/dates';
+import { daysUntilNext, fromToday } from '../lib/dates';
 import { VERIFIED_EVENTS } from './verifiedEvents';
 
 type Seed = Omit<CampusEvent, 'start' | 'end'> & { day: number; from: string; to: string };
@@ -9,6 +9,16 @@ type Seed = Omit<CampusEvent, 'start' | 'end'> & { day: number; from: string; to
  * They are not linked to any real organization. Real events live in verifiedEvents.ts.
  */
 const SEEDS: Seed[] = [
+  {
+    // Judge demo anchor: always the next Thursday, so it reliably overlaps the demo Thursday lab (6:30–8:00 PM).
+    id: 'ev-volleyball-night',
+    title: 'Intramural Volleyball Night',
+    day: daysUntilNext(4), from: '18:00', to: '19:30',
+    location: 'Recreation Center, Court 2',
+    category: 'Sports & Recreation',
+    host: 'Sample host (demo data)',
+    description: 'Pickup volleyball for all skill levels; teams are formed at the door. Sample event used in the demo: it overlaps the Thursday lab in the demo class schedule.',
+  },
   {
     id: 'ev-library-workshop',
     title: 'Research Skills Workshop: Finding Sources Fast',

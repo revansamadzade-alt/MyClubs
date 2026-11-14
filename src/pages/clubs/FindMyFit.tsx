@@ -6,7 +6,7 @@ import { CATEGORIES, CLUBS } from '../../data/clubs';
 import { useStore } from '../../context/StoreContext';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useTitle } from '../../hooks/useTitle';
-import { FIT_WINDOW_DAYS, findMyFit, rankFits, type ClubFit, type FitStatus } from '../../lib/fit';
+import { FIT_WINDOW_DAYS, findMyFit, rankFits, unknownReason, type ClubFit, type FitStatus } from '../../lib/fit';
 import { buildSchedule } from '../../lib/schedule';
 import { addDays, fmtDate, fmtRange, startOfDay } from '../../lib/dates';
 import { CategoryTag, ClubAvatar, FollowButton, PageHeader, SampleBadge } from '../../components/ui';
@@ -83,6 +83,10 @@ function FitCard({ fit, color }: { fit: ClubFit; color: string }) {
         <Link to={`/clubs/discover/${club.id}`} className="btn btn-secondary btn-sm">
           View profile
         </Link>
+        <a href={club.sourceUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+          <ExternalLink size={14} aria-hidden /> Official page
+          <span className="sr-only"> for {club.name} on Campus Pulse (opens in a new tab)</span>
+        </a>
       </div>
     </article>
   );
@@ -193,27 +197,35 @@ export default function FindMyFit() {
       <details className="rounded border border-line" id="group-unknown">
         <summary className="cursor-pointer px-4 py-3 font-bold">
           Schedule unknown ({unknown.length}){' '}
-          <span className="font-normal text-ink-soft">— no verified meeting times or upcoming events listed</span>
+          <span className="font-normal text-ink-soft">
+            — these clubs don't publish times we can check, so no fit is guessed. Each row says why.
+          </span>
         </summary>
         <ul className="divide-y divide-line-soft border-t border-line">
-          {unknown.map(({ club, interest }) => (
-            <li key={club.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-              <ClubAvatar club={club} size="sm" />
-              <div className="min-w-0 flex-1 basis-48">
-                <Link to={`/clubs/discover/${club.id}`} className="font-bold text-link hover:underline">
-                  {club.name}
+          {unknown.map((f) => (
+            <li key={f.club.id} className="flex flex-wrap items-center gap-3 px-4 py-3" data-club={f.club.id}>
+              <ClubAvatar club={f.club} size="sm" />
+              <div className="min-w-0 flex-1 basis-56">
+                <Link to={`/clubs/discover/${f.club.id}`} className="font-bold text-link hover:underline">
+                  {f.club.name}
                 </Link>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
-                  <CategoryTag category={club.category} />
-                  {interest && <span className="font-bold text-link">Matches your interests</span>}
-                  {club.scheduleNote && <span>{club.scheduleNote}</span>}
+                  <CategoryTag category={f.club.category} />
+                  {f.interest && <span className="font-bold text-link">Matches your interests</span>}
                 </div>
+                <p className="mt-1 text-xs text-ink">{unknownReason(f)}</p>
               </div>
-              <a href={club.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-link hover:underline">
-                <ExternalLink size={14} aria-hidden /> Campus Pulse
-                <span className="sr-only"> (opens in a new tab)</span>
-              </a>
-              <FollowButton club={club} size="sm" />
+              <div className="flex flex-wrap items-center gap-3">
+                <a href={f.club.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-link hover:underline">
+                  <ExternalLink size={14} aria-hidden /> Official page
+                  <span className="sr-only"> for {f.club.name} on Campus Pulse (opens in a new tab)</span>
+                </a>
+                <a href={`${f.club.sourceUrl}/events`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-link hover:underline">
+                  <ExternalLink size={14} aria-hidden /> Events
+                  <span className="sr-only"> for {f.club.name} on Campus Pulse (opens in a new tab)</span>
+                </a>
+                <FollowButton club={f.club} size="sm" />
+              </div>
             </li>
           ))}
         </ul>

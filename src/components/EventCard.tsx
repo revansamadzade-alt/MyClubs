@@ -30,6 +30,11 @@ export function EventCard({ event, compact }: { event: CampusEvent; compact?: bo
             )}
           </div>
         )}
+        {event.end <= new Date() && (
+          <span className="mb-1 inline-block rounded-full bg-[#e5e8ea] px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide text-ink">
+            Ended
+          </span>
+        )}
         <h3 className="font-bold leading-snug">
           <Link to={href} className="text-link hover:underline">
             {event.title}

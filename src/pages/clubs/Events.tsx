@@ -10,7 +10,7 @@ import { EventCard } from '../../components/EventCard';
 import { ChipGroup, EmptyState, PageHeader, SearchInput } from '../../components/ui';
 import { useTitle } from '../../hooks/useTitle';
 
-type View = 'all' | 'saved' | 'clubs';
+type View = 'all' | 'saved' | 'clubs' | 'past';
 type When = 'any' | 'week' | 'two-weeks';
 type Source = 'all' | 'verified' | 'sample';
 
@@ -34,10 +34,13 @@ export default function Events() {
 
   const now = new Date();
   const upcoming = EVENTS.filter((e) => e.end > now);
+  const past = EVENTS.filter((e) => e.end <= now).reverse();
   const inView = (v: View) =>
-    upcoming.filter((e) =>
-      v === 'saved' ? saved.includes(e.id) : v === 'clubs' ? !!e.clubId && followed.includes(e.clubId) : true,
-    );
+    v === 'past'
+      ? past
+      : v === 'saved'
+        ? [...upcoming, ...past].filter((e) => saved.includes(e.id))
+        : upcoming.filter((e) => (v === 'clubs' ? !!e.clubId && followed.includes(e.clubId) : true));
 
   const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
   const limit = when === 'week' ? addDays(startOfDay(now), 7) : when === 'two-weeks' ? addDays(startOfDay(now), 14) : null;
@@ -53,6 +56,7 @@ export default function Events() {
     { value: 'all', label: `All events (${inView('all').length})` },
     { value: 'saved', label: `Saved (${inView('saved').length})` },
     { value: 'clubs', label: `From clubs I follow (${inView('clubs').length})` },
+    { value: 'past', label: `Past (${past.length})` },
   ];
 
   const usedCategories = CATEGORIES.filter((c) => upcoming.some((e) => e.category === c));
@@ -136,7 +140,9 @@ export default function Events() {
         >
           {view === 'clubs'
             ? 'No verified events from the clubs you follow yet. Real club events will appear here once they are verified.'
-            : 'Try another keyword, category or date range.'}
+            : view === 'past'
+              ? 'No events have ended yet. Ended events stay here with their original published dates.'
+              : 'Try another keyword, category or date range.'}
         </EmptyState>
       )}
     </>

@@ -3,6 +3,7 @@ import { ACADEMIC_ITEMS, ACADEMIC_KIND_LABEL, CLASS_SCHEDULE, COURSE_BY_ID } fro
 import { CLUB_BY_ID } from '../data/clubs';
 import { EVENTS } from '../data/events';
 import { addDays, dateKey, startOfDay, withTime } from './dates';
+import { inSemester } from '../config/semester';
 
 /**
  * academic  – sample Canvas deadlines and sessions
@@ -74,6 +75,7 @@ export function academicItems(from: Date, to: Date): ScheduleItem[] {
 export function classItems(from: Date, to: Date): ScheduleItem[] {
   const out: ScheduleItem[] = [];
   for (let d = startOfDay(from); d < to; d = addDays(d, 1)) {
+    if (!inSemester(d)) continue;
     for (const s of CLASS_SCHEDULE) {
       if (!s.days.includes(d.getDay())) continue;
       const course = COURSE_BY_ID[s.courseId];
@@ -102,6 +104,7 @@ export function meetingItems(clubIds: string[], from: Date, to: Date): ScheduleI
   const out: ScheduleItem[] = [];
   const ids = [...new Set(clubIds)];
   for (let d = startOfDay(from); d < to; d = addDays(d, 1)) {
+    if (!inSemester(d)) continue;
     for (const id of ids) {
       const club = CLUB_BY_ID[id];
       if (!club) continue;

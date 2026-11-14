@@ -57,6 +57,12 @@ export default function EventDetail() {
         <SaveEventButton event={event} />
       </header>
 
+      {event.end <= new Date() && (
+        <p role="note" className="mt-4 rounded border border-line bg-surface p-3 text-sm text-ink">
+          This event ended on {fmtLongDate(event.end)}. Its date and time are shown exactly as published.
+        </p>
+      )}
+
       <div className="mt-6 grid grid-cols-1 gap-8 md:grid-cols-[minmax(0,1fr)_280px]">
         <div>
           <dl className="space-y-3">

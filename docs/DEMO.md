@@ -20,9 +20,9 @@
 | 0:40 | Click **Find My Fit** | "Here's the core idea. We compare each club's verified meeting times and real upcoming events with your class schedule." |
 | 0:55 | Point at Accounting Association (Fits) and Chess Club (Partial fit) | "Accounting meets Wednesdays at six — you're free. Chess Club meets Thursdays too, which overlaps your Thursday lab by exactly 90 minutes. Clubs that don't publish times are kept separate — we never guess." |
 | 1:10 | Click **Follow** on Accounting Association | "One click to follow. The rest of the app updates instantly." |
-| 1:20 | Open **Campus Events**, choose a verified event (e.g. *General Body Meeting: Coping with Family Stress*), click **Save** | "Real events from Campus Pulse. Saving puts it on my calendar — it doesn't RSVP; the official link does that." |
-| 1:35 | Open **My Campus Life** (Week view, next week) | "Classes, deadlines, club meetings and events in one calendar. The conflict panel shows exactly where my week collides." |
-| 1:50 | Click the Thursday **COMPSCI 235 Lab** item | "Click anything for details — here's the 90-minute overlap with Chess Club. Assignment due times never count as conflicts." |
+| 1:20 | Open **Campus Events**, save **Intramural Volleyball Night** (sample event, always next Thursday 6–7:30 PM) | "Verified events come from Campus Pulse and link to the official page; sample events are labeled. Saving puts it on my calendar — it doesn't RSVP." |
+| 1:35 | Open **My Campus Life** (Week view) | "Classes, deadlines, club meetings and events in one calendar. The conflict panel shows exactly where my week collides — volleyball overlaps my Thursday lab by 60 minutes." |
+| 1:50 | Click the Thursday **COMPSCI 235 Lab** item | "Click anything for details — every overlap with its exact window. Assignment due times never count as conflicts." |
 | 2:00 | Close | "MyClubs: find clubs that fit your life, not just your interests." |
 
 ## Backup plan
@@ -30,8 +30,10 @@
 - **No Wi-Fi:** run `npm run build && npm run preview` before judging; the app has no runtime network dependency
   except Google Fonts (falls back to system fonts).
 - **Something looks off:** click **Reset demo** in the MyClubs header, or clear site data and reload.
-- **Verified events have passed:** the demo still works with sample events (Campus Events → source filter
-  *Sample events only*) and the weekly class/club schedules; Find My Fit's key examples are weekly.
+- **Verified events have passed:** nothing in the script depends on them. Ended events move to the **Past** tab with
+  their published dates; the volleyball sample event, weekly classes and Chess/Accounting schedules keep the demo
+  working (tested with the clock set to Dec 1, 2026). Weekly classes and meetings stop after the demo semester ends
+  (Dec 10, 2026); change `VITE_SEMESTER_START` / `VITE_SEMESTER_END` if judging falls outside it.
 - **Laptop failure:** walk through `docs/screenshots/` (dashboard → discover → find my fit → profile → calendar →
   conflict details) in that order using the same script.
 - **Questions about data:** clubs/events come from public Campus Pulse listings (links on every page); courses,

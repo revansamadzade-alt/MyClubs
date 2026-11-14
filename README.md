@@ -22,7 +22,8 @@ calendar that flags real time conflicts.
   Click any item for details; real overlaps are flagged with the exact window (assignment due times never count).
 - **Discover** — 28 real UMass organizations with search, category filters, sorting and source-linked profiles.
 - **Campus Events** — 19 verified upcoming events (official links, host club) plus clearly labeled sample events.
-- **My Clubs** — follow/unfollow (tracking only, not membership), upcoming activity, persistence in `localStorage`.
+- **My Clubs** — follow/unfollow (tracking only, not membership), upcoming activity, persistence in `localStorage`
+  that stays in sync across open tabs.
 - **Canvas-style shell** — dashboard, global navigation and To Do panel matched to the real Canvas layout.
 
 ## How MyClubs differs from Campus Pulse
@@ -52,6 +53,19 @@ npm run preview   # serve the production build (offline backup)
 ```
 
 Use **Reset demo** in the MyClubs header to restore the demo state. Judge walkthrough: [docs/DEMO.md](docs/DEMO.md).
+
+The demo semester (Sep 2 – Dec 10, 2026) bounds weekly classes and club meetings; override it with
+`VITE_SEMESTER_START`, `VITE_SEMESTER_END` and `VITE_SEMESTER_NAME` (see `src/config/semester.ts`).
+
+## Tests
+
+```bash
+npm test           # logic tests: overlaps, deadlines, duplicates, semester bounds, verified dates, Find My Fit
+npm run test:e2e   # browser suite (191 checks); needs `npm run dev` running and Google Chrome installed
+```
+
+Both suites use a fixed clock (default `2026-11-13T12:00:00`, America/New_York) so results never depend on today's
+date. Override with `MYCLUBS_TEST_NOW`, `MYCLUBS_TEST_TZ`, `MYCLUBS_BASE_URL` and `CHROME_PATH`.
 
 ## Built with
 

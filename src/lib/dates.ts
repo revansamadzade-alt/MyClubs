@@ -27,6 +27,11 @@ export function fromToday(offset: number, hhmm: string): Date {
   return withTime(addDays(startOfDay(new Date()), offset), hhmm);
 }
 
+/** Days until the next `dow` strictly after today (1–7). */
+export function daysUntilNext(dow: number): number {
+  return (dow - startOfDay(new Date()).getDay() + 7) % 7 || 7;
+}
+
 /** Next occurrence (today included) of weekday `dow` at `hhmm`. */
 export function nextDow(dow: number, hhmm: string): Date {
   const today = startOfDay(new Date());

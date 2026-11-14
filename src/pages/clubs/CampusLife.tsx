@@ -185,6 +185,18 @@ function AgendaRow({ item, overlaps, past, onOpen }: { item: ScheduleItem; overl
   );
 }
 
+function useMinWidth(px: number): boolean {
+  const query = `(min-width: ${px}px)`;
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = () => setMatches(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [query]);
+  return matches;
+}
+
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3">
@@ -255,6 +267,9 @@ function ItemDialog({ item, pool, onClose }: { item: ScheduleItem | null; pool: 
             {item.location && <DetailRow label="Location">{item.location}</DetailRow>}
           </dl>
           {item.description && <p className="mt-3 text-sm leading-relaxed text-ink-soft">{item.description}</p>}
+          {event && item.end <= new Date() && (
+            <p className="mt-3 rounded bg-surface p-2 text-xs text-ink">This event has ended (shown with its published date).</p>
+          )}
 
           {item.isDeadline ? (
             <p className="mt-4 rounded bg-surface p-3 text-xs text-ink-soft">
@@ -322,6 +337,7 @@ export default function CampusLife() {
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
   const [shown, setShown] = useState<Record<ScheduleKind, boolean>>({ academic: true, meeting: true, event: true, clubEvent: true });
   const [selected, setSelected] = useState<ScheduleItem | null>(null);
+  const wide = useMinWidth(640);
 
   const now = new Date();
   const { from, to, days } = rangeFor(view, anchor);
@@ -512,7 +528,34 @@ export default function CampusLife() {
         </div>
       )}
 
-      {view === 'week' && (
+      {view === 'week' && !wide && (
+        <div className="space-y-5" aria-label="Week, one day per row">
+          {days.map((d) => {
+            const dayItems = forDay(d);
+            return (
+              <section key={d.toISOString()} aria-labelledby={`wk-${d.getTime()}`}>
+                <h3 id={`wk-${d.getTime()}`} className="flex items-center gap-2 border-b border-line pb-1.5 text-sm font-bold text-ink">
+                  {fmtLongDate(d)}
+                  {isSameDay(d, now) && (
+                    <span className="rounded-full bg-umass px-2 py-0.5 text-[0.6875rem] font-bold uppercase text-white">Today</span>
+                  )}
+                </h3>
+                {dayItems.length ? (
+                  <ul className="divide-y divide-line-soft">
+                    {dayItems.map((i) => (
+                      <AgendaRow key={i.id} item={i} overlaps={conflicts.get(i.id)} past={i.end < now} onOpen={setSelected} />
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="py-2 text-sm text-ink-soft">Free</p>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {view === 'week' && wide && (
         <div className="overflow-x-auto">
           <div className="grid min-w-[760px] grid-cols-7 gap-px overflow-hidden rounded border border-line bg-line">
             {days.map((d) => {
