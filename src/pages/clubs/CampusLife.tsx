@@ -204,10 +204,13 @@ function ItemDialog({ item, pool, onClose }: { item: ScheduleItem | null; pool: 
     if (!item && d.open) d.close();
   }, [item]);
 
-  const meta = item ? KIND_META[item.kind] : null;
-  const Icon = item ? KIND_ICON[item.kind] : null;
-  const overlaps = item ? overlapsFor(item, pool) : [];
+  const { isSaved, isFollowing } = useStore();
   const event = item?.eventId ? EVENT_BY_ID[item.eventId] : undefined;
+  const kind: ScheduleKind | null = item ? (event ? (isSaved(event.id) ? 'event' : 'clubEvent') : item.kind) : null;
+  const meta = kind ? KIND_META[kind] : null;
+  const badge = event && kind === 'clubEvent' && !(event.clubId && isFollowing(event.clubId)) ? 'Event (not saved)' : meta?.label;
+  const Icon = kind ? KIND_ICON[kind] : null;
+  const overlaps = item ? overlapsFor(item, pool) : [];
 
   return (
     <dialog
@@ -224,7 +227,7 @@ function ItemDialog({ item, pool, onClose }: { item: ScheduleItem | null; pool: 
               className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-bold"
               style={{ backgroundColor: meta.soft, color: meta.color, border: `1px ${meta.dashed ? 'dashed' : 'solid'} ${meta.color}` }}
             >
-              <Icon size={13} aria-hidden /> {meta.label}
+              <Icon size={13} aria-hidden /> {badge}
             </span>
             <button
               type="button"
@@ -261,7 +264,7 @@ function ItemDialog({ item, pool, onClose }: { item: ScheduleItem | null; pool: 
             <div className="mt-4 rounded border border-warn/40 bg-warn-soft p-3 text-sm" role="note">
               <p className="flex items-center gap-1.5 font-bold text-warn">
                 <TriangleAlert size={16} aria-hidden />
-                {item.kind === 'clubEvent' ? 'Would overlap if you attend' : 'Schedule conflict'}
+                {kind === 'clubEvent' ? 'Would overlap if you attend' : 'Schedule conflict'}
               </p>
               <ul className="mt-2 space-y-2">
                 {overlaps.map((o) => (

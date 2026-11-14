@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { GlobalNav } from './GlobalNav';
@@ -16,17 +16,24 @@ function PrototypeFooter() {
 export function AppShell() {
   const { pathname } = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     setDrawerOpen(false);
     window.scrollTo(0, 0);
   }, [pathname]);
 
+  // A modal <dialog> traps focus, makes the page inert, closes on Escape and returns focus to the menu button.
   useEffect(() => {
+    const d = drawerRef.current;
+    if (!d) return;
+    if (drawerOpen && !d.open) d.showModal();
+    if (!drawerOpen && d.open) d.close();
     if (!drawerOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawerOpen(false);
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const desktop = window.matchMedia('(min-width: 768px)');
+    const onChange = () => desktop.matches && setDrawerOpen(false);
+    desktop.addEventListener('change', onChange);
+    return () => desktop.removeEventListener('change', onChange);
   }, [drawerOpen]);
 
   return (
@@ -51,6 +58,7 @@ export function AppShell() {
           className="grid h-10 w-10 place-items-center rounded hover:bg-umass-dark"
           aria-label="Open global navigation"
           aria-expanded={drawerOpen}
+          aria-controls="mobile-nav"
         >
           <Menu size={24} aria-hidden />
         </button>
@@ -58,27 +66,26 @@ export function AppShell() {
           UMass Amherst
         </Link>
       </header>
-      {drawerOpen && (
-        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Global navigation">
+      <dialog
+        ref={drawerRef}
+        id="mobile-nav"
+        aria-label="Menu"
+        onClose={() => setDrawerOpen(false)}
+        onClick={(e) => e.target === drawerRef.current && drawerRef.current?.close()}
+        className="on-dark m-0 h-full max-h-none w-72 max-w-none bg-umass p-0 shadow-xl backdrop:bg-black/40 md:hidden"
+      >
+        <div className="relative h-full">
+          <GlobalNav variant="drawer" onNavigate={() => setDrawerOpen(false)} />
           <button
             type="button"
-            className="absolute inset-0 bg-black/40"
-            aria-label="Close navigation"
             onClick={() => setDrawerOpen(false)}
-          />
-          <div className="on-dark relative h-full w-72 shadow-xl">
-            <GlobalNav variant="drawer" onNavigate={() => setDrawerOpen(false)} />
-            <button
-              type="button"
-              onClick={() => setDrawerOpen(false)}
-              className="absolute right-2 top-2 grid h-10 w-10 place-items-center rounded text-white hover:bg-umass-dark"
-              aria-label="Close navigation"
-            >
-              <X size={22} aria-hidden />
-            </button>
-          </div>
+            className="absolute right-2 top-2 grid h-10 w-10 place-items-center rounded text-white hover:bg-umass-dark"
+            aria-label="Close navigation"
+          >
+            <X size={22} aria-hidden />
+          </button>
         </div>
-      )}
+      </dialog>
 
       <div className="md:pl-[84px]">
         <main id="main" tabIndex={-1} className="outline-none">

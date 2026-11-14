@@ -3,3 +3,7 @@ dist
 *.local
 .vite
 .DS_Store
+
+# Machine-specific local config (kept on disk, not tracked)
+.mcp.json
+.claude/settings.local.json
