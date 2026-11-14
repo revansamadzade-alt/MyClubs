@@ -541,7 +541,7 @@ await section('12 Calendar', async () => {
   check('Persist', 'calendar data persists after refresh', (await labels('Sunrise Hike: Mount Sugarloaf')).length === 1);
 
   await goto('/');
-  check('E Regression', 'dashboard: 6 course cards + To Do', await ev(`return $$('main article').length === 6 && $('main h1').textContent === 'Dashboard' && $('aside h2').textContent.includes('To Do')`));
+  check('E Regression', 'dashboard: 8 course cards + To Do', await ev(`return $$('main article').length === 8 && $('main h1').textContent === 'Dashboard' && $('aside h2').textContent.includes('To Do')`));
   check('E Regression', 'dashboard Coming Up shows verified meetings', await ev(`return $('aside').textContent.includes('Chess Club')`));
 });
 

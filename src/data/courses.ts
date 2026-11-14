@@ -63,6 +63,26 @@ export const COURSES: Course[] = [
     cover: 'grid',
     badges: { announcements: 3 },
   },
+  {
+    id: 'math235',
+    name: 'Linear Algebra for Computing',
+    code: 'MATH 235 (100236) FA26',
+    short: 'MATH 235',
+    term: 'Fall 2026',
+    color: '#7b3f99',
+    cover: 'topo',
+    badges: { announcements: 1, assignments: 0 },
+  },
+  {
+    id: 'cics110',
+    name: 'Ethics in Computing Seminar',
+    code: 'CICS 110 (100110) FA26',
+    short: 'CICS 110',
+    term: 'Fall 2026',
+    color: '#4b5d16',
+    cover: 'forest',
+    badges: { assignments: 0, discussions: 1 },
+  },
 ];
 
 export const COURSE_BY_ID: Record<string, Course | undefined> = Object.fromEntries(COURSES.map((c) => [c.id, c]));

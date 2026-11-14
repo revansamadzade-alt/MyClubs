@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -43,7 +43,10 @@ const TODO_ICONS: Record<AcademicKind, LucideIcon> = {
 
 function CourseCard({ course }: { course: Course }) {
   return (
-    <article className="w-full overflow-hidden rounded-[4px] bg-white shadow-[0_2px_5px_rgba(0,0,0,0.3)] sm:w-[262px]">
+    <article
+      className="group w-full overflow-hidden rounded-[4px] bg-white shadow-[0_2px_5px_rgba(0,0,0,0.3)] transition-shadow hover:shadow-[0_4px_12px_rgba(0,0,0,0.35)] sm:w-[262px]"
+      style={{ '--course': course.color } as CSSProperties}
+    >
       <div className="relative h-[146px]">
         <Link to="/courses" tabIndex={-1} aria-hidden className="absolute inset-0">
           <PatternCover color={course.color} variant={course.cover} className="h-full w-full" />
@@ -60,13 +63,13 @@ function CourseCard({ course }: { course: Course }) {
       <div className="px-5 pt-3">
         <Link
           to="/courses"
-          className="block truncate text-base font-bold leading-[1.3] hover:underline"
+          className="block truncate text-base font-bold leading-[1.3] group-hover:underline"
           style={{ color: course.color }}
         >
           {course.name} {course.short}
         </Link>
-        <p className="truncate text-base leading-[1.375] text-ink">{course.code}</p>
-        <p className="text-xs leading-4 text-ink">{course.term}</p>
+        <p className="truncate text-base leading-[1.375] text-[#474747] group-hover:text-[var(--course)] group-hover:underline">{course.code}</p>
+        <p className="text-xs leading-4 text-[#474747] group-hover:text-[var(--course)] group-hover:underline">{course.term}</p>
       </div>
       <div className="mb-2 mt-1 flex h-10 items-center">
         {(Object.keys(course.badges) as (keyof Course['badges'])[]).map((key) => {
@@ -76,7 +79,7 @@ function CourseCard({ course }: { course: Course }) {
             <span key={key} className="flex basis-1/4 justify-center">
               <Link
                 to="/courses"
-                className="relative grid h-9 w-9 place-items-center rounded text-ink hover:bg-surface hover:text-link"
+                className="relative grid h-9 w-9 place-items-center rounded text-[#474747] hover:bg-surface hover:text-link"
                 aria-label={`${label}${count ? `, ${count} unread` : ''} (prototype)`}
               >
                 <Icon size={21} strokeWidth={1.5} aria-hidden />
@@ -96,7 +99,7 @@ function CourseCard({ course }: { course: Course }) {
 
 function SidebarHeading({ children }: { children: ReactNode }) {
   return (
-    <h2 className="flex items-center gap-2 border-b border-line-soft pb-2 text-[1.125rem] font-normal leading-[1.25] text-ink">
+    <h2 className="flex items-center gap-2 border-b border-line-soft pb-2 text-[1.125rem] font-normal leading-[1.25] text-black">
       {children}
     </h2>
   );
@@ -127,15 +130,15 @@ function TodoPanel() {
           const course = COURSE_BY_ID[t.courseId];
           return (
             <li key={t.id} className="flex gap-2 py-1 pl-[22px]">
-              <Icon size={20} strokeWidth={1.5} className="mt-[-1px] shrink-0 text-ink" aria-hidden />
+              <Icon size={20} strokeWidth={1.5} className="mt-[-1px] shrink-0 text-[#606060]" aria-hidden />
               <div className="min-w-0 flex-1">
                 <Link to="/courses" className="block truncate text-link underline underline-offset-2 hover:text-link-dark">
                   {t.title}
                 </Link>
-                <p className="text-ink">
+                <p className="text-[#586874]">
                   {course?.name} {course?.code}
                 </p>
-                <p className="text-ink">
+                <p className="text-black">
                   {t.points ? `${t.points} points | ` : ''}
                   {t.end ? `${relativeDay(t.start)} · ${fmtRange(t.start, t.end)}` : fmtDue(t.start)}
                 </p>
@@ -143,7 +146,7 @@ function TodoPanel() {
               <button
                 type="button"
                 onClick={() => setDismissed((d) => [...d, t.id])}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded text-ink hover:bg-surface"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded text-[#273540] hover:bg-surface"
                 aria-label={`Dismiss ${t.title}`}
               >
                 <X size={18} strokeWidth={2.5} aria-hidden />
@@ -193,7 +196,7 @@ export default function Dashboard() {
     <div className="flex flex-col lg:flex-row">
       <section className="min-w-0 flex-1 px-4 pb-6 pt-[29px] sm:px-8 lg:px-12">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line-soft pb-[17px]">
-          <h1 className="text-[2.3125rem] font-bold leading-none text-[#1b1b1b]">Dashboard</h1>
+          <h1 className="text-[2.3125rem] font-bold leading-none text-black">Dashboard</h1>
           <div className="flex items-center gap-3">
             <button
               type="button"

@@ -11,8 +11,8 @@
   --color-line: #c7cdd1;
   --color-line-soft: #e5e8ea;
   --color-surface: #f5f5f5;
-  --color-link: #0374b5;
-  --color-link-dark: #02598b;
+  --color-link: #053a7f;
+  --color-link-dark: #032c61;
   --color-badge: #9e1b20;
   --color-success: #0b874b;
   --color-warn: #a84400;
@@ -71,12 +71,12 @@ body {
     background: var(--color-link-dark);
   }
   .btn-secondary {
-    background: var(--color-surface);
-    border-color: var(--color-line);
-    color: var(--color-ink);
+    background: #f2f4f4;
+    border-color: #d7dade;
+    color: #273540;
   }
   .btn-secondary:hover {
-    background: #e7e9eb;
+    background: #e6e9ea;
   }
   .btn-ghost {
     background: transparent;
