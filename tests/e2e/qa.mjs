@@ -1168,7 +1168,8 @@ await section('22 Reliability', async () => {
   // IndexedDB blocked: no crash, honest warning, text drafts still saved, retry and remove.
   await ev(`Object.defineProperty(window, 'indexedDB', { configurable: true, get: () => ({ open() { const r = {}; setTimeout(() => r.onerror && r.onerror(), 0); return r; } }) }); return true`);
   await setFile('offline-resume.pdf', `'%PDF-1.4 OFFLINE'`);
-  const memOnly = await waitFor(`$('[data-testid=resume-memory-only]')`, 8000);
+  // Wait for the complete state: the warning and the attachment label can land in consecutive renders.
+  const memOnly = await waitFor(`$('[data-testid=resume-memory-only]') && $('[data-testid=resume-attached]')?.textContent.includes('this visit only')`, 8000);
   check(
     A,
     "IndexedDB failure: warns the file won't survive a refresh",
