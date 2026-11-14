@@ -3,7 +3,7 @@ import { ArrowLeft, CalendarCheck2, CalendarX2, Clock, MapPin, TriangleAlert, Us
 import { EVENT_BY_ID } from '../../data/events';
 import { CLUB_BY_ID } from '../../data/clubs';
 import { useStore } from '../../context/StoreContext';
-import { fmtLongDate, fmtRange, fmtTime } from '../../lib/dates';
+import { fmtLongDate, fmtRange } from '../../lib/dates';
 import { KIND_META, conflictsForEvent } from '../../lib/schedule';
 import { CategoryTag, DateTile, EmptyState, FollowButton, SampleBadge, SaveEventButton } from '../../components/ui';
 import { useTitle } from '../../hooks/useTitle';
@@ -108,11 +108,14 @@ export default function EventDetail() {
                   {conflicts.length > 1 ? 's' : ''}
                 </p>
                 <ul className="mt-2 space-y-2">
-                  {conflicts.map((c) => (
+                  {conflicts.map(({ item: c, from, to }) => (
                     <li key={c.id} className="border-l-[3px] pl-2" style={{ borderColor: KIND_META[c.kind].color }}>
                       <span className="block font-bold text-ink">{c.title}</span>
-                      <span className="text-ink-soft">
-                        {KIND_META[c.kind].label} · {c.isDeadline ? `due ${fmtTime(c.start)}` : fmtRange(c.start, c.end)}
+                      <span className="block text-ink-soft">
+                        {KIND_META[c.kind].label} · {fmtRange(c.start, c.end)}
+                      </span>
+                      <span className="block text-warn">
+                        Overlap {fmtRange(from, to)} ({Math.round((to.getTime() - from.getTime()) / 60000)} min)
                       </span>
                     </li>
                   ))}
@@ -124,7 +127,8 @@ export default function EventDetail() {
               </p>
             )}
             <p className="mt-3 text-xs text-ink-soft">
-              Checked against sample course deadlines, meetings of clubs you follow, and your other saved events.
+              Checked against timed course activities, meetings of clubs you follow, and your other saved events.
+              Assignment due times are not counted as conflicts.
             </p>
             <Link to="/clubs/campus-life" className="mt-3 inline-block text-sm text-link hover:underline">
               Open My Campus Life

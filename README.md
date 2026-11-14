@@ -23,7 +23,7 @@ npm run build    # typecheck + production build
 | My Clubs | `/clubs/following` | Followed clubs, next meetings, 14-day activity feed, unfollow |
 | Campus Events | `/clubs/events` | All / Saved / From followed clubs tabs, search, category + date filters, save/unsave |
 | Event detail | `/clubs/events/:id` | Full info, save, schedule-conflict check |
-| My Campus Life | `/clubs/campus-life` | Week + agenda views of deadlines, club meetings and saved events, with overlaps flagged |
+| My Campus Life | `/clubs/campus-life` | Month / week / agenda calendar of sample course work, followed clubs' weekly meetings and events, and saved events; click any item for details; real time overlaps flagged with the overlap window (due times never count as conflicts) |
 
 Follows, saved events and reviews persist in `localStorage` (`myclubs:*` keys). Use **Reset demo** in the MyClubs header to restore defaults.
 Sample dates are generated relative to today, so the demo always shows upcoming items.

@@ -100,7 +100,7 @@ export default function Following() {
           {upcoming.length ? (
             <ul className="space-y-2">
               {upcoming.map((item) => {
-                const event = item.kind === 'event' ? EVENT_BY_ID[item.id] : undefined;
+                const event = item.eventId ? EVENT_BY_ID[item.eventId] : undefined;
                 return (
                   <li key={item.id} className="flex gap-3 rounded border border-line p-3">
                     <span
