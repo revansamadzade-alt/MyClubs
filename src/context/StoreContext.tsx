@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { Review } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useToast } from './ToastContext';
@@ -69,10 +69,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const followed = useMemo(() => normalizeFollowed(followedRaw), [followedRaw]);
   const saved = useMemo(() => normalizeSaved(savedRaw), [savedRaw]);
 
-  // Persist migrated/cleaned lists once so toggles operate on clean data.
+  // Persist migrated/cleaned lists once so toggles operate on clean data, and say so if demo follows were removed.
+  const migrationNoticeShown = useRef(false);
   useEffect(() => {
-    if (followed.join() !== followedRaw.join()) setFollowed(followed);
-  }, [followed, followedRaw, setFollowed]);
+    if (followed.join() === followedRaw.join()) return;
+    const removed = new Set(followedRaw.filter((id) => !CLUB_BY_ID[LEGACY_CLUB_IDS[id] ?? id])).size;
+    setFollowed(followed);
+    if (removed && !migrationNoticeShown.current) {
+      migrationNoticeShown.current = true;
+      notify(
+        `Removed ${removed} fictional demo club${removed === 1 ? '' : 's'} from your follows. MyClubs now lists real UMass organizations; equivalent clubs were kept.`,
+      );
+    }
+  }, [followed, followedRaw, setFollowed, notify]);
   useEffect(() => {
     if (saved.join() !== savedRaw.join()) setSaved(saved);
   }, [saved, savedRaw, setSaved]);
