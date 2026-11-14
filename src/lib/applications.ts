@@ -34,7 +34,15 @@ export function statusLabel(app: TrackedApplication): string {
   return STATUS_META[app.status].label;
 }
 
-export const orgFor = (id: string): Club | undefined => (id === DEMO_ORG_ID ? DEMO_ORG : CLUB_BY_ID[id]);
+/** True only when a verified official deadline has passed (it closes at the end of that day, local time). */
+export function applicationsClosed(club: Club, now = new Date()): boolean {
+  const deadline = club.application?.process === 'required' ? club.application.deadline : undefined;
+  if (!deadline) return false;
+  const [y, m, d] = deadline.split('-').map(Number);
+  return new Date(y, m - 1, d + 1) <= now;
+}
+
+export const orgFor =(id: string): Club | undefined => (id === DEMO_ORG_ID ? DEMO_ORG : CLUB_BY_ID[id]);
 
 export function isHttpUrl(s: string): boolean {
   try {

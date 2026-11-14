@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
-import { ApplyButton, MembershipInfo } from '../../components/Applications';
+import { ApplyButton, MembershipInfo, MembershipTag } from '../../components/Applications';
 import { ArrowLeft, BadgeCheck, CalendarClock, Clock, ExternalLink, Info, MapPin, SearchX } from 'lucide-react';
 import { CLUB_BY_ID, campusPulseLinks } from '../../data/clubs';
 import { EVENTS } from '../../data/events';
@@ -70,9 +70,13 @@ export default function ClubProfile() {
                 {isHost ? 'Listed as an event host on Campus Pulse' : 'Verified on Campus Pulse'}
                 <span className="sr-only"> (opens in a new tab)</span>
               </a>
+              <MembershipTag club={club} />
             </div>
           </div>
-          <FollowButton club={club} />
+          <div className="flex flex-wrap gap-2">
+            <FollowButton club={club} />
+            <ApplyButton club={club} />
+          </div>
         </div>
       </header>
 
@@ -133,8 +137,9 @@ export default function ClubProfile() {
             </h2>
             <MembershipInfo club={club} />
             <div className="mt-3 flex flex-wrap gap-2">
-              <ApplyButton club={club} size="sm" />
-              {getApplication(club.id) ? (
+              {club.application?.process === 'required' ? (
+                <ApplyButton club={club} size="sm" />
+              ) : getApplication(club.id) ? (
                 <Link to={`/clubs/applications/${club.id}`} className="btn btn-secondary btn-sm">
                   View application tracker
                 </Link>

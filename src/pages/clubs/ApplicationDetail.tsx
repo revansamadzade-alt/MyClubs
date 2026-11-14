@@ -4,8 +4,8 @@ import { ArrowLeft, BadgeCheck, ExternalLink, Info, SearchX } from 'lucide-react
 import type { ApplicationStatus, Club, TrackedApplication } from '../../types';
 import { CLUB_BY_ID, campusPulseLinks } from '../../data/clubs';
 import { useStore } from '../../context/StoreContext';
-import { DEMO_ORG, DEMO_ORG_ID, STATUS_META, isHttpUrl, statusLabel } from '../../lib/applications';
-import { ApplyButton, MembershipInfo, ProgressSteps, StatusPill } from '../../components/Applications';
+import { DEMO_ORG, DEMO_ORG_ID, STATUS_META, applicationsClosed, isHttpUrl, statusLabel } from '../../lib/applications';
+import { MembershipInfo, ProgressSteps, StatusPill } from '../../components/Applications';
 import { CategoryTag, ClubAvatar, EmptyState, SampleBadge } from '../../components/ui';
 import { useTitle } from '../../hooks/useTitle';
 
@@ -261,12 +261,31 @@ export default function ApplicationDetail() {
 
   const app = getApplication(club.id);
   const cp = campusPulseLinks(club);
+  const required = club.application?.process === 'required';
+  const closed = applicationsClosed(club);
 
   return (
     <article>
       <Header club={club} back="/clubs/applications" />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div>
+        <div className="space-y-4">
+          <section className="card p-4" aria-labelledby="how-heading">
+            <h2 id="how-heading" className="mb-2 font-bold text-ink">
+              {required ? 'How to apply' : 'Membership & applications'}
+            </h2>
+            <MembershipInfo club={club} />
+            {club.application?.applyUrl && !closed && (
+              <a href={club.application.applyUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary mt-3">
+                Open official application <ExternalLink size={16} aria-hidden />
+                <span className="sr-only"> for {club.name} (opens in a new tab)</span>
+              </a>
+            )}
+            {required && (
+              <p className="mt-3 text-xs text-ink-soft">
+                MyClubs never submits applications. Apply through the organization, then update your status here.
+              </p>
+            )}
+          </section>
           {app ? (
             <TrackerForm key={app.updatedAt} club={club} app={app} />
           ) : (
@@ -283,13 +302,6 @@ export default function ApplicationDetail() {
           )}
         </div>
         <aside className="space-y-4">
-          <div className="card p-4">
-            <h2 className="mb-2 font-bold text-ink">Membership &amp; applications</h2>
-            <MembershipInfo club={club} />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <ApplyButton club={club} size="sm" />
-            </div>
-          </div>
           <div className="card p-4 text-sm">
             <h2 className="mb-2 font-bold text-ink">Official sources</h2>
             <a href={cp.page} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-link hover:underline">

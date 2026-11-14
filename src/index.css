@@ -78,6 +78,14 @@ body {
   .btn-secondary:hover {
     background: #e6e9ea;
   }
+  .btn-outline {
+    background: #fff;
+    border-color: var(--color-link);
+    color: var(--color-link);
+  }
+  .btn-outline:hover {
+    background: #eef3f9;
+  }
   .btn-ghost {
     background: transparent;
     color: var(--color-link);

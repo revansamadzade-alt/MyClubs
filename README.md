@@ -27,8 +27,10 @@ calendar that flags real time conflicts.
   that stays in sync across open tabs.
 - **Applications** — a personal tracker for organizations you want to join: status (Interested → Draft in progress →
   Submitted externally → Decision received, all self-reported), progress steps, the link you used, your own reminder
-  date and notes. Discover can filter by membership process, and **Apply** appears only where an application is
-  verified as required. A demo application for a fictional club shows the draft → submit flow and is labeled
+  date and notes. Discover can filter by membership process. **Apply** sits next to Follow on cards and profiles, only
+  where an application is verified as required; it saves the organization to Applications (never twice) and opens its
+  page with the official application link when published, otherwise *Application link not available*. *Applications
+  closed* appears only after a verified official deadline. A demo application for a fictional club shows the draft → submit flow and is labeled
   *Demo only — not sent to the organization*.
 - **Canvas-style shell** — dashboard, global navigation and To Do panel matched to the real Canvas layout.
 
@@ -67,7 +69,7 @@ The demo semester (Sep 2 – Dec 10, 2026) bounds weekly classes and club meetin
 
 ```bash
 npm test           # logic + feed tests: overlaps, deadlines, duplicates, semester bounds, feed parsing, snapshot integrity
-npm run test:e2e   # browser suite (221 checks); needs `npm run dev` running and Google Chrome installed
+npm run test:e2e   # browser suite (229 checks); needs `npm run dev` running and Google Chrome installed
 ```
 
 Both suites use a fixed clock (default `2026-11-13T12:00:00`, America/New_York) so results never depend on today's

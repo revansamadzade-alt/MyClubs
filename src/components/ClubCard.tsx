@@ -59,10 +59,10 @@ export function ClubCard({ club }: { club: Club }) {
         </dl>
         <div className="mt-auto flex flex-wrap gap-2 pt-4">
           <FollowButton club={club} size="sm" />
+          <ApplyButton club={club} size="sm" />
           <Link to={href} state={linkState} className="btn btn-secondary btn-sm">
             View profile
           </Link>
-          <ApplyButton club={club} size="sm" />
         </div>
       </div>
     </article>

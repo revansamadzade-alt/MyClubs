@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ExternalLink, FileCheck2, Users } from 'lucide-react';
 import type { Club, TrackedApplication } from '../types';
-import { STATUS_META, STEPS, fmtDay, statusLabel } from '../lib/applications';
+import { useStore } from '../context/StoreContext';
+import { STATUS_META, STEPS, applicationsClosed, fmtDay, statusLabel } from '../lib/applications';
 import { cx } from '../lib/cx';
 
 export function StatusPill({ app }: { app: TrackedApplication }) {
@@ -64,26 +65,68 @@ export function MembershipInfo({ club }: { club: Club }) {
         , checked {fmtDay(a.verifiedOn)}.
       </p>
       {a.process === 'required' && (
-        <p className="mt-2 text-ink">
-          <strong>Deadline:</strong> {a.deadline ? fmtDay(a.deadline) : 'Deadline not listed'}
-        </p>
+        <dl className="mt-2 space-y-1 text-ink">
+          <div>
+            <dt className="inline font-bold">Deadline: </dt>
+            <dd className="inline">
+              {a.deadline && applicationsClosed(club) ? (
+                <>
+                  <strong className="text-badge">Applications closed</strong> (deadline was {fmtDay(a.deadline)})
+                </>
+              ) : a.deadline ? (
+                fmtDay(a.deadline)
+              ) : (
+                'Deadline not listed'
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="inline font-bold">Official application: </dt>
+            <dd className="inline">
+              {a.applyUrl ? (
+                <a href={a.applyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-link hover:underline">
+                  Open official application <ExternalLink size={13} aria-hidden />
+                  <span className="sr-only"> (opens in a new tab)</span>
+                </a>
+              ) : (
+                'Application link not available'
+              )}
+            </dd>
+          </div>
+        </dl>
       )}
     </div>
   );
 }
 
-/** "Apply" goes to the organization's official application when published, otherwise to the MyClubs details page. */
+/**
+ * "Apply" saves the organization to Applications (once, never a duplicate) and opens its application page, which
+ * offers the official application link when one is published. Nothing is ever submitted.
+ */
 export function ApplyButton({ club, size }: { club: Club; size?: 'sm' }) {
+  const { getApplication, saveApplication } = useStore();
+  const navigate = useNavigate();
   if (club.application?.process !== 'required') return null;
-  const cls = cx('btn btn-primary', size === 'sm' && 'btn-sm');
-  return club.application.applyUrl ? (
-    <a href={club.application.applyUrl} target="_blank" rel="noopener noreferrer" className={cls}>
-      Apply <ExternalLink size={14} aria-hidden />
-      <span className="sr-only"> to {club.name} (official site, opens in a new tab)</span>
-    </a>
-  ) : (
-    <Link to={`/clubs/applications/${club.id}`} className={cls}>
-      Apply<span className="sr-only"> to {club.name}: application details</span>
-    </Link>
+  const sm = size === 'sm' && 'btn-sm';
+  const tracked = !!getApplication(club.id);
+  if (!tracked && applicationsClosed(club))
+    return (
+      <button type="button" disabled className={cx('btn btn-secondary cursor-not-allowed opacity-60', sm)}>
+        Applications closed<span className="sr-only"> for {club.name}</span>
+      </button>
+    );
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (!tracked) saveApplication(club.id, {}, `Added ${club.name} to Applications. Nothing was submitted.`);
+        navigate(`/clubs/applications/${club.id}`);
+      }}
+      className={cx('btn btn-outline', sm)}
+    >
+      <FileCheck2 size={16} aria-hidden />
+      {tracked ? 'View application' : 'Apply'}
+      <span className="sr-only">{tracked ? ` for ${club.name}` : ` to ${club.name}: save it to Applications and see how to apply`}</span>
+    </button>
   );
 }

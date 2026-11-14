@@ -148,3 +148,16 @@ test('Find My Fit explains every unknown schedule', () => {
   assert.match(reason('kpopdanceclub'), /Next listed event/);
   assert.match(reason('roboticsclub'), /no meeting times/);
 });
+
+test('Applications closed only after a verified official deadline has passed', async () => {
+  const { applicationsClosed } = await load('/src/lib/applications.ts');
+  const org = (application) => ({ ...CLUBS[0], application });
+  const required = (deadline) => org({ process: 'required', evidence: 'x', sourceUrl: 'x', verifiedOn: '2026-11-01', deadline });
+  assert.equal(applicationsClosed(required('2026-11-12')), true, 'yesterday (clock is Nov 13)');
+  assert.equal(applicationsClosed(required('2026-11-13')), false, 'open until the end of the deadline day');
+  assert.equal(applicationsClosed(required('2026-12-01')), false);
+  assert.equal(applicationsClosed(required(undefined)), false, 'no listed deadline is never "closed"');
+  assert.equal(applicationsClosed(org({ process: 'open', evidence: 'x', sourceUrl: 'x', verifiedOn: '2026-11-01', deadline: '2026-11-01' })), false);
+  assert.equal(applicationsClosed(org(undefined)), false);
+  assert.ok(CLUBS.every((c) => !applicationsClosed(c)), 'no real organization publishes a deadline');
+});

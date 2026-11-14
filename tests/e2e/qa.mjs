@@ -790,25 +790,32 @@ await section('20 Applications', async () => {
   await goto('/clubs/discover?process=required');
   const req = (await ev(`return cardTitles()`)).sort();
   check('P Apps', 'filter: application required (verified only)', JSON.stringify(req) === JSON.stringify(['Best Buddies', 'Comedy League']), req);
-  check('P Apps', 'required cards: tag + Apply, Follow separate', await ev(`return cards().every(c => c.textContent.includes('Application required') && !!byText('a', 'Apply', c) && !!c.querySelector('button[aria-pressed]'))`));
+  const sideBySide = (root) => `(() => { const f = ${root}.querySelector('button[aria-pressed]'); const a = f?.nextElementSibling; return !!a && a.tagName === 'BUTTON' && /Apply|View application/.test(a.textContent) && Math.abs(a.getBoundingClientRect().top - f.getBoundingClientRect().top) < 2; })()`;
+  check('P Apps', 'required cards: label, Follow and Apply side by side', await ev(`return cards().every(c => c.textContent.includes('Application required') && ${sideBySide('c')})`));
   await goto('/clubs/discover?process=open');
   const open = (await ev(`return cardTitles()`)).sort();
   check('P Apps', 'filter: open membership (verified)', JSON.stringify(open) === JSON.stringify(['Chess Club', 'Outing Club', 'UMass Gaming and Esports Club']), open);
-  check('P Apps', 'open-membership clubs have no Apply button', await ev(`return cards().every(c => !byText('a', 'Apply', c))`));
+  check('P Apps', 'open-membership clubs have no Apply button', await ev(`return cards().every(c => !byText('a, button', 'Apply', c))`));
+  await goto('/clubs/discover');
+  check('P Apps', 'Apply only on the 2 verified clubs', (await ev(`return $$('main article button').filter(b => b.textContent.trim().startsWith('Apply')).length`)) === 2);
 
   await goto('/clubs/discover/comedyleague');
   await click(`$('main header button[aria-pressed]')`);
   check('P Apps', 'following does not start an application', (await ev(`return (ls('myclubs:applications') ?? []).length`)) === 0);
-  check('P Apps', 'profile shows verified process, quote, deadline not listed', await ev(`const t = $('main').textContent; return t.includes('Membership & applications') && t.includes('You MUST AUDITION to join!') && t.includes('Deadline not listed')`));
+  check('P Apps', 'profile shows verified process, quote, deadline not listed', await ev(`const t = $('main').textContent; return t.includes('Membership & applications') && t.includes('You MUST AUDITION to join!') && t.includes('Deadline not listed') && t.includes('Application link not available')`));
+  check('P Apps', 'profile header: label, Follow and Apply side by side', await ev(`return $('main article > header').textContent.includes('Application required') && ${sideBySide("$('main article > header')")}`));
   await goto('/clubs/discover/roboticsclub');
-  check('P Apps', 'unknown process is not assumed', await ev(`const t = $('main').textContent; return t.includes('Application process not listed') && !byText('main a', 'Apply')`));
+  check('P Apps', 'unknown process is not assumed', await ev(`const t = $('main').textContent; return t.includes('Application process not listed') && !byText('main a, main button', 'Apply')`));
 
   await goto('/clubs/discover/comedyleague');
-  await click(`byText('main aside a', 'Apply')`);
+  await click(`byText('main header button', 'Apply')`);
   await waitFor(`location.pathname === '/clubs/applications/comedyleague'`);
-  check('P Apps', 'Apply opens application details', (await path()) === '/clubs/applications/comedyleague');
-  await click(`byText('main button', 'Track application')`);
-  check('P Apps', 'track → Interested', await ev(`return $('main').textContent.includes('Interested') && ls('myclubs:applications').length === 1`));
+  check('P Apps', 'Apply opens the organization in Applications', (await path()) === '/clubs/applications/comedyleague' && (await ev(`const t = $('main').textContent; return $('main h1').textContent.includes('Comedy League') && t.includes('How to apply') && t.includes('Application link not available') && t.includes('never submits')`)));
+  check('P Apps', 'Apply saves it as Interested', await ev(`const a = ls('myclubs:applications'); return $('main').textContent.includes('Interested') && a.length === 1 && a[0].clubId === 'comedyleague'`));
+  await goto('/clubs/discover/comedyleague');
+  await click(`byText('main header button', 'View application')`);
+  await waitFor(`location.pathname === '/clubs/applications/comedyleague'`);
+  check('P Apps', 'Apply again: View application, no duplicate', (await ev(`return ls('myclubs:applications').length`)) === 1);
   await ev(`typeInto($('main select'), 'draft'); typeInto($('main input[type=url]'), 'not a link'); return true`);
   await click(`byText('main button', 'Save tracker')`);
   check('P Apps', 'invalid link rejected', await ev(`return !!$('[role=alert]') && $('[role=alert]').textContent.includes('https://')`));
@@ -826,8 +833,9 @@ await section('20 Applications', async () => {
   const tab = await json(`/json/new?${encodeURIComponent(BASE + '/')}`, 'PUT');
   const b = await connect(tab.webSocketDebuggerUrl);
   await goto('/clubs/applications', b.call);
-  await goto('/clubs/discover/bestbuddies');
-  await click(`byText('main aside button', 'Track application')`);
+  await goto('/clubs/discover?process=required');
+  await click(`byText('button', 'Apply', card('Best Buddies'))`);
+  check('P Apps', 'Apply on a Discover card opens that organization', await waitFor(`location.pathname === '/clubs/applications/bestbuddies' && $('main h1')?.textContent.includes('Best Buddies')`));
   check('P Apps', 'tracking in tab A appears in tab B', await waitFor(`$('main').textContent.includes('Best Buddies')`, 4000, b.call));
   b.sock.close();
   await fetch(`http://127.0.0.1:${PORT}/json/close/${tab.id}`).catch(() => {});
@@ -856,11 +864,15 @@ await section('20 Applications', async () => {
   check('P Apps', 'demo kept separate from real applications', await ev(`return cards().length === 1 && $('#demo-app').closest('section').textContent.includes('Draft in progress')`));
   check('P Apps', 'nav counts: My Clubs & Associations 3, Applications 2', await ev(`const t = $('#clubs-nav').textContent; return /My Clubs & Associations\\s*3/.test(t) && /Applications\\s*2/.test(t)`));
 
-  for (const p of ['/clubs/applications', '/clubs/applications/demo-org', '/clubs/applications/comedyleague']) {
+  for (const p of ['/clubs/applications', '/clubs/applications/demo-org', '/clubs/applications/comedyleague', '/clubs/discover?process=required', '/clubs/discover/bestbuddies']) {
     await viewport(375, 812);
     await goto(p);
     check('P Apps', `no horizontal scroll at 375px: ${p}`, await ev(`return document.documentElement.scrollWidth <= 375`));
   }
+  await goto('/clubs/discover?process=required');
+  check('P Apps', 'mobile: Follow and Apply stay side by side on cards', await ev(`return cards().length === 2 && cards().every(c => ${sideBySide('c')})`));
+  await goto('/clubs/discover/bestbuddies');
+  check('P Apps', 'mobile: Follow and Apply side by side on profile', await ev(`return ${sideBySide("$('main article > header')")}`));
   await viewport(1440);
   await ev(`localStorage.clear(); return true`);
 });
