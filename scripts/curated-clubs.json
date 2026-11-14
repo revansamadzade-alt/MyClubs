@@ -64,7 +64,13 @@
   "tags": [
    "Academic Council"
   ],
-  "meetings": []
+  "meetings": [],
+  "application": {
+   "process": "open",
+   "evidence": "We accept members from any school within the University and have no restrictions on when you can join throughout the semester.",
+   "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/isenberginvestmentclub",
+   "verifiedOn": "2026-11-14"
+  }
  },
  {
   "id": "180consulting",
@@ -159,7 +165,13 @@
    "Club Sport Council"
   ],
   "meetings": [],
-  "scheduleNote": "Practices during the fall and spring semesters (times not listed)."
+  "scheduleNote": "Practices during the fall and spring semesters (times not listed).",
+  "application": {
+   "process": "open",
+   "evidence": "We welcome anyone to join our team and find their place on our A or B teams.",
+   "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/ladyzooultimate",
+   "verifiedOn": "2026-11-14"
+  }
  },
  {
   "id": "chessclub",
@@ -274,7 +286,13 @@
   "tags": [
    "Recreation Council"
   ],
-  "meetings": []
+  "meetings": [],
+  "application": {
+   "process": "open",
+   "evidence": "YOU CAN JOIN AT ANY TIME!",
+   "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/skiboardclub",
+   "verifiedOn": "2026-11-14"
+  }
  },
  {
   "id": "circlekinternationalclub",
@@ -362,7 +380,8 @@
    "process": "required",
    "evidence": "You MUST AUDITION to join! Auditions held every semester and all shows are free of charge every weekend!",
    "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/comedyleague",
-   "verifiedOn": "2026-11-14"
+   "verifiedOn": "2026-11-14",
+   "template": "audition"
   }
  }
 ]

@@ -14,6 +14,7 @@ import FindMyFit from './pages/clubs/FindMyFit';
 import Applications from './pages/clubs/Applications';
 import ApplicationDetail from './pages/clubs/ApplicationDetail';
 import ApplyForm from './pages/clubs/ApplyForm';
+import ApplicantProfilePage from './pages/clubs/ApplicantProfile';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="discover/:clubId" element={<ClubProfile />} />
           <Route path="fit" element={<FindMyFit />} />
           <Route path="applications" element={<Applications />} />
+          <Route path="applications/profile" element={<ApplicantProfilePage />} />
           <Route path="applications/:clubId" element={<ApplicationDetail />} />
           <Route path="applications/:clubId/apply" element={<ApplyForm />} />
           <Route path="following" element={<Following />} />

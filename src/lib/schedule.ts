@@ -1,17 +1,19 @@
-import type { CampusEvent, Club } from '../types';
+import type { CampusEvent, Club, TrackedApplication } from '../types';
 import { ACADEMIC_ITEMS, ACADEMIC_KIND_LABEL, CLASS_SCHEDULE, COURSE_BY_ID } from '../data/courses';
 import { CLUB_BY_ID } from '../data/clubs';
 import { EVENTS } from '../data/events';
 import { addDays, dateKey, startOfDay, withTime } from './dates';
 import { inSemester } from '../config/semester';
+import { applicationScheduleItems } from './applicationPlanner';
 
 /**
  * academic  – sample Canvas deadlines and sessions
  * meeting   – weekly meeting of a followed club
  * event     – campus event the student saved
  * clubEvent – event posted by a followed club that the student has not saved
+ * application – a date for a tracked application: the student's reminder/interview/audition, or a verified deadline
  */
-export type ScheduleKind = 'academic' | 'meeting' | 'event' | 'clubEvent';
+export type ScheduleKind = 'academic' | 'meeting' | 'event' | 'clubEvent' | 'application';
 
 export interface ScheduleItem {
   id: string;
@@ -30,6 +32,12 @@ export interface ScheduleItem {
   eventId?: string;
   /** A due time only. Never occupies a block of time and never counts as a conflict. */
   isDeadline: boolean;
+  /** A whole-day marker (no time). */
+  allDay?: boolean;
+  /** Application dates link back to this tracked organization. */
+  appClubId?: string;
+  /** Entered by the student, not taken from an official source. */
+  userEntered?: boolean;
 }
 
 export interface Overlap {
@@ -43,6 +51,7 @@ export const KIND_META: Record<ScheduleKind, { label: string; plural: string; co
   meeting: { label: 'Club meeting', plural: 'Club meetings', color: '#881c1c', soft: '#f8ecec' },
   event: { label: 'Saved event', plural: 'Saved events', color: '#0b874b', soft: '#e8f5ee' },
   clubEvent: { label: 'Club event (not saved)', plural: 'Club events', color: '#0b874b', soft: '#ffffff', dashed: true },
+  application: { label: 'Application date', plural: 'Application dates', color: '#5a3a8a', soft: '#f1ecf7' },
 };
 
 const byStart = (a: { start: Date }, b: { start: Date }) => a.start.getTime() - b.start.getTime();
@@ -156,22 +165,28 @@ export function eventToItem(e: CampusEvent, saved: boolean): ScheduleItem {
  * Academic items + meetings of followed clubs + events that are saved or posted by a followed club.
  * Events are read once from EVENTS, so an event that is both saved and from a followed club appears once (as saved).
  */
-export function buildSchedule(opts: { followed: string[]; saved: string[]; from: Date; to: Date }): ScheduleItem[] {
-  const { followed, saved, from, to } = opts;
+export function buildSchedule(opts: { followed: string[]; saved: string[]; from: Date; to: Date; applications?: TrackedApplication[] }): ScheduleItem[] {
+  const { followed, saved, from, to, applications = [] } = opts;
   const savedSet = new Set(saved);
   const followedSet = new Set(followed);
   const events = EVENTS.filter(
     (e) => inRange(e.start, e.end, from, to) && (savedSet.has(e.id) || (!!e.clubId && followedSet.has(e.clubId))),
   ).map((e) => eventToItem(e, savedSet.has(e.id)));
-  return [...academicItems(from, to), ...classItems(from, to), ...meetingItems(followed, from, to), ...events].sort(byStart);
+  return [
+    ...academicItems(from, to),
+    ...classItems(from, to),
+    ...meetingItems(followed, from, to),
+    ...events,
+    ...applicationScheduleItems(applications, from, to),
+  ].sort(byStart);
 }
 
-/** Items the student is committed to that occupy time. Deadlines and unsaved club events are excluded. */
-const blocksTime = (i: ScheduleItem) => !i.isDeadline && i.kind !== 'clubEvent';
+/** Items the student is committed to that occupy time. Deadlines, unsaved club events and application dates are excluded. */
+const blocksTime = (i: ScheduleItem) => !i.isDeadline && i.kind !== 'clubEvent' && i.kind !== 'application';
 
 /** Committed items in `pool` whose time block genuinely overlaps `target`, with the shared window. */
 export function overlapsFor(target: ScheduleItem, pool: ScheduleItem[]): Overlap[] {
-  if (target.isDeadline) return [];
+  if (target.isDeadline || target.kind === 'application') return [];
   return pool
     .filter((o) => o.id !== target.id && blocksTime(o) && o.start < target.end && target.start < o.end)
     .map((o) => ({

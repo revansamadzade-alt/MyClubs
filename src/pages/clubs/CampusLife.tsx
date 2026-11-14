@@ -5,6 +5,7 @@ import {
   CalendarCheck2,
   CalendarDays,
   ChevronLeft,
+  FileCheck2,
   ChevronRight,
   GraduationCap,
   LayoutGrid,
@@ -59,13 +60,15 @@ const KIND_ICON: Record<ScheduleKind, LucideIcon> = {
   meeting: UsersRound,
   event: Ticket,
   clubEvent: Ticket,
+  application: FileCheck2,
 };
 
 const KINDS = Object.keys(KIND_META) as ScheduleKind[];
 const AGENDA_DAYS = 14;
 
 const isView = (v: unknown): v is View => v === 'month' || v === 'week' || v === 'agenda';
-const timeLabel = (i: ScheduleItem) => (i.isDeadline ? `Due ${fmtTime(i.start)}` : fmtRange(i.start, i.end));
+const timeLabel = (i: ScheduleItem) =>
+  i.allDay ? 'All day' : i.isDeadline ? `Due ${fmtTime(i.start)}` : i.kind === 'application' ? fmtTime(i.start) : fmtRange(i.start, i.end);
 const overlapMinutes = (o: { from: Date; to: Date }) => Math.round((o.to.getTime() - o.from.getTime()) / 60000);
 
 function rangeFor(view: View, anchor: Date) {
@@ -115,7 +118,7 @@ function MonthChip({ item, conflicted, past, onOpen }: { item: ScheduleItem; con
       style={kindStyle(item, conflicted)}
     >
       <span className="shrink-0 font-bold" style={{ color: meta.color }}>
-        {item.isDeadline ? 'Due' : fmtShortTime(item.start)}
+        {item.allDay ? 'All day' : item.isDeadline ? 'Due' : fmtShortTime(item.start)}
       </span>
       <span className="min-w-0 truncate text-ink">{item.title}</span>
       {conflicted && <TriangleAlert size={11} className="shrink-0 text-warn" aria-hidden />}
@@ -138,7 +141,7 @@ function WeekChip({ item, conflicted, past, onOpen }: { item: ScheduleItem; conf
       style={kindStyle(item, conflicted)}
     >
       <span className="block text-[0.6875rem] font-bold" style={{ color: meta.color }}>
-        {item.isDeadline ? `Due ${fmtTime(item.start)}` : fmtTime(item.start)}
+        {item.allDay ? 'All day' : item.isDeadline ? `Due ${fmtTime(item.start)}` : fmtTime(item.start)}
       </span>
       <span className="line-clamp-2 block text-xs leading-snug text-ink">{item.title}</span>
       {conflicted && (
@@ -258,7 +261,9 @@ function ItemDialog({ item, pool, onClose }: { item: ScheduleItem | null; pool: 
               {fmtLongDate(item.start)} · {timeLabel(item)}
             </DetailRow>
             {item.context && (
-              <DetailRow label={item.kind === 'academic' ? 'Course' : item.kind === 'meeting' ? 'Club' : 'Host'}>{item.context}</DetailRow>
+              <DetailRow label={item.kind === 'academic' ? 'Course' : item.kind === 'meeting' ? 'Club' : item.kind === 'application' ? 'Organization' : 'Host'}>
+                {item.context}
+              </DetailRow>
             )}
             <DetailRow label="Type">
               {item.typeLabel}
@@ -271,7 +276,13 @@ function ItemDialog({ item, pool, onClose }: { item: ScheduleItem | null; pool: 
             <p className="mt-3 rounded bg-surface p-2 text-xs text-ink">This event has ended (shown with its published date).</p>
           )}
 
-          {item.isDeadline ? (
+          {item.kind === 'application' ? (
+            <p className="mt-4 rounded bg-surface p-3 text-xs text-ink-soft">
+              {item.userEntered
+                ? 'You entered this date yourself. It is a reminder only: MyClubs does not book interviews or auditions, and it is never counted as a schedule conflict.'
+                : "Official deadline from the organization's listing. Deadlines are never counted as schedule conflicts."}
+            </p>
+          ) : item.isDeadline ? (
             <p className="mt-4 rounded bg-surface p-3 text-xs text-ink-soft">
               This is a due time, not a block of time, so it is never counted as a schedule conflict.
             </p>
@@ -313,6 +324,11 @@ function ItemDialog({ item, pool, onClose }: { item: ScheduleItem | null; pool: 
                 View club
               </Link>
             )}
+            {item.kind === 'application' && item.href && (
+              <Link to={item.href} className="btn btn-secondary btn-sm">
+                Open application
+              </Link>
+            )}
             {item.kind === 'academic' && (
               <Link to="/courses" className="btn btn-secondary btn-sm">
                 Open course (prototype)
@@ -328,20 +344,20 @@ function ItemDialog({ item, pool, onClose }: { item: ScheduleItem | null; pool: 
 
 export default function CampusLife() {
   useTitle('My Campus Life');
-  const { followed, saved } = useStore();
+  const { followed, saved, applications } = useStore();
   const [view, setView] = useLocalStorage<View>(
     'myclubs:calendarView',
     window.matchMedia('(min-width: 1024px)').matches ? 'month' : 'agenda',
     isView,
   );
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
-  const [shown, setShown] = useState<Record<ScheduleKind, boolean>>({ academic: true, meeting: true, event: true, clubEvent: true });
+  const [shown, setShown] = useState<Record<ScheduleKind, boolean>>({ academic: true, meeting: true, event: true, clubEvent: true, application: true });
   const [selected, setSelected] = useState<ScheduleItem | null>(null);
   const wide = useMinWidth(640);
 
   const now = new Date();
   const { from, to, days } = rangeFor(view, anchor);
-  const all = buildSchedule({ followed, saved, from, to });
+  const all = buildSchedule({ followed, saved, from, to, applications });
   const items = all.filter((i) => shown[i.kind]);
   const conflicts = findConflicts(all);
   const pairs = conflictPairs(all).filter((p) => p.to > now);
@@ -366,7 +382,7 @@ export default function CampusLife() {
     <>
       <PageHeader
         title="My Campus Life"
-        description="Your demo class schedule and course work, meetings of clubs you follow and campus events — in one calendar, with real time overlaps flagged."
+        description="Your demo class schedule and course work, meetings of clubs you follow, campus events and your application dates — in one calendar, with real time overlaps flagged."
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -402,7 +418,7 @@ export default function CampusLife() {
         </div>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {KINDS.map((k) => {
           const meta = KIND_META[k];
           const Icon = KIND_ICON[k];
@@ -443,7 +459,8 @@ export default function CampusLife() {
       </div>
       <p className="mb-4 text-xs text-ink-soft">
         Solid green = events you saved. Dashed green = events from clubs you follow that you haven't saved; they are not counted as
-        conflicts. Assignment due times are never counted as conflicts.
+        conflicts. Assignment due times are never counted as conflicts. Purple = application dates: reminders you entered, or verified
+        official deadlines.
       </p>
 
       {pairs.length > 0 && (

@@ -799,7 +799,7 @@ await section('20 Applications', async () => {
   check('P Apps', 'required cards: label, Follow and Apply side by side', await ev(`return cards().every(c => c.textContent.includes('Application required') && ${sideBySide('c')})`));
   await goto('/clubs/discover?process=open');
   const open = (await ev(`return cardTitles()`)).sort();
-  check('P Apps', 'filter: open membership (verified)', JSON.stringify(open) === JSON.stringify(['Chess Club', 'Outing Club', 'UMass Gaming and Esports Club']), open);
+  check('P Apps', 'filter: open membership (verified)', JSON.stringify(open) === JSON.stringify(['Chess Club', 'Isenberg Investment Club', 'Outing Club', 'UMass Gaming and Esports Club', 'UMass Ski and Board Club', "Ultimate Frisbee - Women's"]), open);
   check('P Apps', 'open-membership clubs have no Apply button', await ev(`return cards().every(c => !byText('a, button', 'Apply', c))`));
   await goto('/clubs/discover');
   check('P Apps', 'Apply only on the 2 verified clubs', (await ev(`return $$('main article button').filter(b => b.textContent.trim().startsWith('Apply')).length`)) === 2);
@@ -824,10 +824,13 @@ await section('20 Applications', async () => {
   await ev(`typeInto($('main select'), 'draft'); typeInto($('main input[type=url]'), 'not a link'); return true`);
   await click(`byText('main button', 'Save tracker')`);
   check('P Apps', 'invalid link rejected', await ev(`return !!$('[role=alert]') && $('[role=alert]').textContent.includes('https://')`));
-  await ev(`typeInto($('main input[type=url]'), 'https://umassamherst.campuslabs.com/engage/organization/comedyleague'); typeInto($('main input[type=date]'), '2026-11-20'); typeInto($('main textarea'), 'Audition piece: 2-minute improv scene.'); return true`);
+  await ev(`typeInto($('main input[type=url]'), 'https://umassamherst.campuslabs.com/engage/organization/comedyleague'); typeInto($('main textarea'), 'Audition piece: 2-minute improv scene.'); return true`);
   await click(`byText('main button', 'Save tracker')`);
   await reload();
-  check('P Apps', 'tracker persists after refresh', await ev(`const a = ls('myclubs:applications')[0]; return a.status === 'draft' && a.reminder === '2026-11-20' && a.notes.startsWith('Audition') && $('main').textContent.includes('Draft in progress')`));
+  await ev(`typeInto($('[data-testid=date-date]'), '2026-11-20'); return true`);
+  await click(`byText('main button', 'Add date')`);
+  await reload();
+  check('P Apps', 'tracker persists after refresh', await ev(`const a = ls('myclubs:applications')[0]; return a.status === 'draft' && a.dates?.[0]?.date === '2026-11-20' && a.dates[0].kind === 'reminder' && !('reminder' in a) && a.notes.startsWith('Audition') && $('main').textContent.includes('Draft in progress')`));
   await goto('/clubs/applications');
   check('P Apps', 'card: status, progress, deadline, reminder, link', await ev(`const c = cards()[0]; const t = c.textContent; return t.includes('Draft in progress') && t.includes('Deadline not listed') && t.includes('(you entered this)') && t.includes('Link you saved') && !!c.querySelector('ol[aria-label^="Progress: step 2 of 5"]')`));
   await goto('/clubs/applications/comedyleague');
@@ -884,7 +887,7 @@ await section('21 Application forms', async () => {
   // Templates follow the organization's field; browsing a form tracks nothing.
   await goto('/clubs/applications/comedyleague/apply?view=review');
   let t = await mainText();
-  check(A, 'arts org → creative template: portfolio, no GitHub', t.includes('Portfolio URL') && !t.includes('GitHub') && t.includes('What kind of creative work do you enjoy?'));
+  check(A, 'audition org → audition template: reel link, no GitHub, schedule not invented', t.includes('Performance reel or portfolio link') && !t.includes('GitHub') && t.includes('What draws you to audition for this group?') && t.includes('Audition schedule not listed'));
   check(A, 'real org: sample questions kept apart from the official process', t.includes("Sample application questions — not Comedy League's official application.") && t.includes('You MUST AUDITION') && t.includes('Application link not available'));
   await goto('/clubs/applications/bestbuddies/apply?view=review');
   t = await mainText();
@@ -976,7 +979,7 @@ await section('21 Application forms', async () => {
   await next();
   check(A, 'edited answer appears on review', (await mainText()).includes('Computer Engineering'));
   await click(`byText('main button', 'Copy answers')`, 300);
-  check(A, 'copy answers gives feedback', await waitFor(`$$('[role=status]').some(e => /Answers copied|Copying is blocked/.test(e.textContent))`, 2500));
+  check(A, 'copy answers gives feedback', await waitFor(`$$('[role=status]').some(e => /Answers copied|Couldn't copy/.test(e.textContent))`, 2500));
 
   // 10–11. Finish → prepared, never "sent".
   await click(`byText('main button', 'Finish Demo Application')`, 300);
@@ -1015,11 +1018,11 @@ await section('21 Application forms', async () => {
   await next();
   check(A, 'creative step 2: portfolio first, résumé optional', await ev(`return $('#step-heading').textContent === 'Résumé & professional links' && !!$('#f-portfolio') && !$('#f-github')`));
   await next();
-  await fill({ creativeWork: 'Improv and sketch writing.', creativeProject: 'Wrote and staged a 10-minute sketch.', mediums: 'Improv games, script writing.', collaborate: 'I love ensemble comedy.', commitment: 'Not sure yet' });
+  await fill({ auditionInterest: 'I love ensemble comedy.', performRole: 'Performer and writer', auditionAvailability: 'Weekday evenings', commitment: 'Not sure yet' });
   await next();
-  await click(`byText('main button', 'Finish Demo Application')`, 300);
+  await click(`byText('main button', 'Finish — mark answers prepared')`, 300);
   t = await mainText();
-  check(A, 'real org: prepared, with official next step', t.includes('Demo application prepared — not submitted to the organization.') && t.includes("apply through Comedy League's official process") && t.includes('contact them on Campus Pulse'));
+  check(A, 'real org: prepared, with official next step', t.includes('Answers prepared — not submitted to the organization.') && t.includes('Answers prepared — not submitted') && !t.includes('Demo application prepared') && t.includes("apply through Comedy League's official process") && t.includes('contact them on Campus Pulse'));
 
   // Removing an application deletes its résumé.
   await goto('/clubs/applications');
@@ -1039,6 +1042,315 @@ await section('21 Application forms', async () => {
     check(A, `no horizontal scroll at 375px: ${p}`, await ev(`return document.documentElement.scrollWidth <= 375`));
   }
   check(A, 'mobile: compact stepper', await ev(`return $$('ol[aria-label="Application steps"] li').length >= 3`));
+  await viewport(1440);
+  await goto('/');
+  await ev(`localStorage.clear(); return true`);
+});
+
+// 22. Reliability: autosave + refresh, two-tab editing, résumé viewing/storage failures, real export contents
+await section('22 Reliability', async () => {
+  const A = 'R Reliability';
+  await viewport(1440);
+  await goto('/');
+  await ev(`localStorage.clear(); return true`);
+  const fill = (map, call = send) => evalIn(call, `const m = ${JSON.stringify(map)}; for (const [k, v] of Object.entries(m)) typeInto($('#f-' + k), v); return true`);
+  const stored = (id) => ev(`return (ls('myclubs:applications') ?? []).find((a) => a.clubId === ${JSON.stringify(id)}) ?? null`);
+  const idb = (key) =>
+    ev(`return await new Promise((res) => { const q = indexedDB.open('myclubs-files'); q.onupgradeneeded = () => q.result.createObjectStore('resumes'); q.onsuccess = () => { const g = q.result.transaction('resumes').objectStore('resumes').get(${JSON.stringify(key)}); g.onsuccess = () => { res(g.result ? g.result.name : null); q.result.close(); }; }; q.onerror = () => res('error'); })`);
+  const setFile = (name, body) =>
+    ev(`const dt = new DataTransfer(); dt.items.add(new File([${body}], ${JSON.stringify(name)}, { type: 'application/pdf' })); const i = $('[data-testid=resume-input]'); i.files = dt.files; i.dispatchEvent(new Event('change', { bubbles: true })); return true`);
+  const STEP_TITLES = ['Personal information', 'Résumé & professional links', 'Organization questions', 'Review your answers'];
+  const toStep = async (title) => {
+    await waitFor(`$('#step-heading')`, 3000);
+    for (let i = 0; i < 6; i++) {
+      const cur = await ev(`return $('#step-heading')?.textContent`);
+      if (cur === title) return true;
+      const dir = STEP_TITLES.indexOf(cur) < STEP_TITLES.indexOf(title) ? 'Next' : 'Previous';
+      await click(`byText('main button', ${JSON.stringify(dir)})`);
+      await waitFor(`$('#step-heading')?.textContent !== ${JSON.stringify(cur)}`, 2000);
+    }
+    return false;
+  };
+  const toPersonal = async (path = '/clubs/applications/demo-org/apply') => {
+    await goto(path);
+    await fill({ fullName: 'Alex Minuteman', email: 'aminuteman@umass.edu', major: 'Computer Science', classYear: '2028' });
+  };
+
+  // Autosave: typing then refreshing immediately keeps the text (flushed on pagehide, not only after the debounce).
+  await toPersonal();
+  check(A, 'save indicator: Saving… while a change is pending', await ev(`return $('[data-testid=save-state]').textContent.includes('Saving')`));
+  await waitFor(`$('[data-testid=save-state]').textContent.startsWith('Saved in this browser at')`, 3000);
+  check(A, 'save indicator: Saved only after the write', await ev(`return $('[data-testid=save-state]').textContent.startsWith('Saved in this browser at') && ls('myclubs:applications')[0].form.values.fullName === 'Alex Minuteman'`));
+  await ev(`typeInto($('#f-minor'), 'Mathematics and Statistics'); return true`);
+  await send('Page.reload', {});
+  await waitFor(`document.readyState === 'complete' && $('#f-minor')`, 5000);
+  check(A, 'rapid typing then immediate refresh keeps the text', await ev(`return $('#f-minor').value === 'Mathematics and Statistics' && $('#f-fullName').value === 'Alex Minuteman'`));
+  await ev(`typeInto($('#f-minor'), 'Mathematics'); return true`);
+  await goto('/clubs/applications');
+  check(A, 'leaving the page right after typing keeps the text', (await stored('demo-org'))?.form?.values?.minor === 'Mathematics');
+
+  // Two tabs, same application: no silent overwrite.
+  await goto('/clubs/applications/demo-org/apply');
+  const tab = await json(`/json/new?${encodeURIComponent(BASE + '/')}`, 'PUT');
+  const b = await connect(tab.webSocketDebuggerUrl);
+  const evB = (expr) => evalIn(b.call, expr);
+  await goto('/clubs/applications/demo-org/apply', b.call);
+  check(A, 'other tab detected (both tabs told)', (await waitFor(`$('[data-testid=other-tab]')`, 3000, b.call)) && (await waitFor(`$('[data-testid=other-tab]')`, 3000)));
+  await evB(`typeInto($('#f-major'), 'Edited in tab B'); return true`);
+  await ev(`typeInto($('#f-major'), 'Edited in tab A'); return true`);
+  await click(`byText('main button', 'Save draft')`);
+  check(A, 'tab B sees a conflict instead of overwriting', await waitFor(`$('[data-testid=conflict]')`, 3000, b.call));
+  await sleep(700); // longer than the autosave delay: tab B's pending save must not have been written
+  check(A, 'newer answers from tab A are kept', (await stored('demo-org'))?.form?.values?.major === 'Edited in tab A');
+  check(A, 'tab B save state says not saved', await evB(`return $('[data-testid=save-state]').textContent.includes('changed in another tab')`));
+  await evalIn(b.call, `byText('main button', "Keep this tab's version").click(); return true`);
+  await sleep(150);
+  check(A, "keep this tab's version writes it deliberately", (await stored('demo-org'))?.form?.values?.major === 'Edited in tab B');
+  check(A, 'tab A (no unsaved edits) loads the newer version automatically', await waitFor(`$('#f-major').value === 'Edited in tab B' && $('[data-testid=form-notice]')?.textContent.includes('another tab')`, 3000));
+  // Conflict resolved the other way: load the other tab's version.
+  await evB(`typeInto($('#f-major'), 'Tab B again'); return true`);
+  await ev(`typeInto($('#f-major'), 'Tab A wins'); return true`);
+  await click(`byText('main button', 'Save draft')`);
+  await waitFor(`$('[data-testid=conflict]')`, 3000, b.call);
+  await evalIn(b.call, `byText('main button', "Load the other tab's version").click(); return true`);
+  check(A, "load the other tab's version replaces local edits", await waitFor(`$('#f-major').value === 'Tab A wins' && !$('[data-testid=conflict]')`, 3000, b.call));
+  // Different applications in two tabs: both saved, no warning.
+  await goto('/clubs/applications/bestbuddies/apply', b.call);
+  await fill({ fullName: 'Tab B on Best Buddies' }, b.call);
+  await ev(`typeInto($('#f-fullName'), 'Tab A on demo'); return true`);
+  await click(`byText('main button', 'Save draft')`);
+  await evalIn(b.call, `byText('main button', 'Save draft').click(); return true`);
+  await sleep(200);
+  check(A, 'separate applications edited at once: both kept, no warning', (await stored('demo-org'))?.form?.values?.fullName === 'Tab A on demo' && (await stored('bestbuddies'))?.form?.values?.fullName === 'Tab B on Best Buddies' && !(await evB(`return !!$('[data-testid=conflict]')`)) && !(await ev(`return !!$('[data-testid=conflict]')`)));
+  b.sock.close();
+  await fetch(`http://127.0.0.1:${PORT}/json/close/${tab.id}`).catch(() => {});
+  check(A, 'other-tab notice clears when that tab closes', await waitFor(`!$('[data-testid=other-tab]')`, 3000));
+
+  // Résumé: view opens the right file, popup blocking, cleanup, missing file, replace.
+  await goto('/clubs/applications/demo-org/apply');
+  await toStep('Résumé & professional links');
+  await setFile('marker-resume.pdf', `'%PDF-1.4 MARKER-ONE body'`);
+  await waitFor(`$('[data-testid=resume-attached]')?.textContent.includes('marker-resume.pdf')`);
+  await ev(`window.__opened = []; window.open = (u) => { window.__opened.push(u); return { opener: {} }; }; return true`);
+  await click(`byText('[data-testid=resume-attached] button', 'View')`);
+  const viewed = await ev(`const u = window.__opened[0]; if (!u) return null; const b = await (await fetch(u)).blob(); return { url: u, type: b.type, text: await b.text() }`);
+  check(A, 'View opens the attached PDF (blob URL, PDF type, right bytes)', viewed?.url?.startsWith('blob:') && viewed.type === 'application/pdf' && viewed.text.includes('MARKER-ONE'), JSON.stringify(viewed));
+  await ev(`window.open = () => null; return true`);
+  await click(`byText('[data-testid=resume-attached] button', 'View')`);
+  check(A, 'popup blocked: clear message and a download fallback', await ev(`return [...$$('main [role=alert]')].some(e => e.textContent.includes('blocked the new tab')) && $$('main a[download]').some(a => a.getAttribute('download') === 'marker-resume.pdf')`));
+  await setFile('second-resume.pdf', `'%PDF-1.4 MARKER-TWO body'`);
+  await waitFor(`$('[data-testid=resume-attached]')?.textContent.includes('second-resume.pdf')`);
+  check(A, 'Replace swaps the stored file', (await idb('demo-org')) === 'second-resume.pdf' && (await stored('demo-org'))?.form?.resume?.name === 'second-resume.pdf');
+  await reload();
+  await toStep('Résumé & professional links');
+  await waitFor(`$('[data-testid=resume-attached]')`);
+  await ev(`window.__opened = []; window.open = (u) => { window.__opened.push(u); return { opener: {} }; }; window.__revoked = 0; const r = URL.revokeObjectURL.bind(URL); URL.revokeObjectURL = (u) => { window.__revoked++; r(u); }; return true`);
+  await click(`byText('[data-testid=resume-attached] button', 'View')`);
+  const afterRefresh = await ev(`const u = window.__opened[0]; return u ? await (await fetch(u)).text() : null`);
+  check(A, 'View after refresh opens the replaced file from IndexedDB', afterRefresh?.includes('MARKER-TWO'), afterRefresh);
+  await click(`byText('main a', 'Application overview')`);
+  check(A, 'object URLs released when leaving the form', await waitFor(`window.__revoked >= 1`, 2000));
+  await ev(`await new Promise((res) => { const q = indexedDB.open('myclubs-files'); q.onsuccess = () => { const t = q.result.transaction('resumes', 'readwrite'); t.objectStore('resumes').delete('demo-org'); t.oncomplete = () => { q.result.close(); res(true); }; }; }); return true`);
+  await goto('/clubs/applications/demo-org/apply');
+  await toStep('Résumé & professional links');
+  check(A, 'missing stored file: asks to reattach instead of pretending', await waitFor(`$('[data-testid=resume-drop]')?.textContent.includes('Reattach your résumé: second-resume.pdf')`, 3000));
+
+  // IndexedDB blocked: no crash, honest warning, text drafts still saved, retry and remove.
+  await ev(`Object.defineProperty(window, 'indexedDB', { configurable: true, get: () => ({ open() { const r = {}; setTimeout(() => r.onerror && r.onerror(), 0); return r; } }) }); return true`);
+  await setFile('offline-resume.pdf', `'%PDF-1.4 OFFLINE'`);
+  await waitFor(`$('[data-testid=resume-memory-only]')`, 6000);
+  check(A, "IndexedDB failure: warns the file won't survive a refresh", await ev(`const t = $('[data-testid=resume-memory-only]').textContent; return t.includes("can't store files") && t.includes('gone after a refresh') && $('[data-testid=resume-attached]').textContent.includes('this visit only')`));
+  check(A, 'IndexedDB failure: no stored résumé is claimed', (await stored('demo-org'))?.form?.resume === undefined);
+  await ev(`typeInto($('#f-portfolio'), 'alex.dev'); return true`);
+  await sleep(700);
+  check(A, 'IndexedDB failure: text answers still save', (await stored('demo-org'))?.form?.values?.portfolio === 'https://alex.dev');
+  await click(`byText('[data-testid=resume-memory-only] button', 'Try saving again')`);
+  check(A, 'retry reports it still failed', await waitFor(`[...$$('main [role=alert]')].some(e => e.textContent.includes("Still couldn't save"))`, 6000));
+  await click(`byText('[data-testid=resume-memory-only] button', 'Remove')`);
+  check(A, 'remove clears the temporary attachment', await ev(`return !$('[data-testid=resume-attached]') && !$('[data-testid=resume-memory-only]')`));
+  await reload();
+
+  // Export: the actual clipboard and .txt contents.
+  await goto('/clubs/applications/demo-org/apply');
+  await toStep('Organization questions');
+  await fill({
+    projects: 'Café robot — “line follower”\nSecond line: PID tuning 😀',
+    whyTech: 'Build things & learn <together>.',
+    techAreas: 'Robotics',
+    role: 'Hardware',
+    techTeam: 'FIRST Robotics.',
+    commitment: '2–4 hours',
+  });
+  await toStep('Review your answers');
+  await ev(`window.__copied = null; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => { window.__copied = t; } } }); return true`);
+  await click(`byText('main button', 'Copy answers')`);
+  const copied = await ev(`return window.__copied`);
+  const labels = ['Full name:', 'UMass email address:', 'What technical projects have you worked on? Describe one you are proud of.', 'How much time could you realistically commit per week?'];
+  check(A, 'clipboard: organization, applicant and answers', !!copied && copied.startsWith('Campus Builders Collective (demo): application answers') && copied.includes('Full name: Tab A on demo') && copied.includes('UMass email address: aminuteman@umass.edu'), copied?.slice(0, 200));
+  check(A, 'clipboard: special characters and line breaks intact', !!copied && copied.includes('Café robot — “line follower”\nSecond line: PID tuning 😀') && copied.includes('Build things & learn <together>.') && !copied.includes('\r'));
+  check(A, 'clipboard: every question once, empty optionals marked, no file contents', !!copied && labels.every((l) => copied.split(l).length === 2) && copied.includes('LinkedIn profile URL: Not provided') && !copied.includes('%PDF'));
+  await ev(`window.__blob = null; window.__dl = null; const c = URL.createObjectURL.bind(URL); URL.createObjectURL = (b) => { window.__blob = b; return c(b); }; HTMLAnchorElement.prototype.click = function () { window.__dl = this.getAttribute('download'); }; return true`);
+  await click(`byText('main button', 'Download (.txt)')`);
+  const dl = await ev(`return window.__blob ? { name: window.__dl, type: window.__blob.type, text: await window.__blob.text() } : null`);
+  check(A, 'download: named .txt, UTF-8 text, same content as the clipboard', dl?.name === 'demo-org-application-answers.txt' && dl.type === 'text/plain;charset=utf-8' && dl.text === copied, JSON.stringify({ name: dl?.name, type: dl?.type }));
+  await ev(`Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied'); } } }); document.execCommand = () => false; return true`);
+  await click(`byText('main button', 'Copy answers')`);
+  check(A, 'clipboard blocked: helpful message', await waitFor(`$$('[role=status]').some(e => e.textContent.includes("Couldn't copy") && e.textContent.includes('Download'))`, 2500));
+  await goto('/');
+  await ev(`localStorage.clear(); return true`);
+});
+
+// 23. Applicant profile, reusable résumé, audition form, decisions, migration, calendar dates, Dashboard To Do
+await section('23 Application features', async () => {
+  const A = 'S Features';
+  await viewport(1440);
+  await goto('/');
+  await ev(`localStorage.clear(); return true`);
+  await ev(`await new Promise((r) => { const q = indexedDB.deleteDatabase('myclubs-files'); q.onsuccess = q.onerror = q.onblocked = () => r(true); }); return true`);
+  const fill = (map) => ev(`const m = ${JSON.stringify(map)}; for (const [k, v] of Object.entries(m)) typeInto($('#f-' + k), v); return true`);
+  const stored = (id) => ev(`return (ls('myclubs:applications') ?? []).find((a) => a.clubId === ${JSON.stringify(id)}) ?? null`);
+  const idb = (key) =>
+    ev(`return await new Promise((res) => { const q = indexedDB.open('myclubs-files'); q.onupgradeneeded = () => q.result.createObjectStore('resumes'); q.onsuccess = () => { const g = q.result.transaction('resumes').objectStore('resumes').get(${JSON.stringify(key)}); g.onsuccess = () => { res(g.result ? g.result.name : null); q.result.close(); }; }; q.onerror = () => res('error'); })`);
+  const setFile = (name, body) =>
+    ev(`const dt = new DataTransfer(); dt.items.add(new File([${body}], ${JSON.stringify(name)}, { type: 'application/pdf' })); const i = $('[data-testid=resume-input]'); i.files = dt.files; i.dispatchEvent(new Event('change', { bubbles: true })); return true`);
+  const STEP_TITLES = ['Personal information', 'Résumé & professional links', 'Organization questions', 'Review your answers'];
+  const toStep = async (title) => {
+    await waitFor(`$('#step-heading')`, 3000);
+    for (let i = 0; i < 6; i++) {
+      const cur = await ev(`return $('#step-heading')?.textContent`);
+      if (cur === title) return true;
+      const dir = STEP_TITLES.indexOf(cur) < STEP_TITLES.indexOf(title) ? 'Next' : 'Previous';
+      await click(`byText('main button', ${JSON.stringify(dir)})`);
+      await waitFor(`$('#step-heading')?.textContent !== ${JSON.stringify(cur)}`, 2000);
+    }
+    return false;
+  };
+
+  // An application with saved answers exists before the profile is created.
+  await goto('/clubs/applications/demo-org/apply');
+  await fill({ fullName: 'Existing Name', major: 'History' });
+  await click(`byText('main button', 'Save draft')`);
+
+  // Profile: create, validate, persist.
+  await goto('/clubs/applications');
+  check(A, 'Applications page offers an optional profile', await ev(`const c = $('[data-testid=profile-card]'); return !!c && c.textContent.includes('Optional') && !!byText('a', 'Create profile', c)`));
+  await click(`byText('[data-testid=profile-card] a', 'Create profile')`);
+  await waitFor(`location.pathname === '/clubs/applications/profile' && $('main h1')`);
+  check(A, 'profile page: title, crumb, privacy note', await ev(`return $('main h1').textContent === 'My applicant profile' && $('nav[aria-label=Breadcrumb]').textContent.includes('My applicant profile') && $('main').textContent.includes('Stored only in this browser. This is not an account')`));
+  await fill({ fullName: 'Jordan Lee', email: 'jordan@gmail.com' });
+  await click(`byText('main button', 'Save profile')`);
+  check(A, 'profile: invalid email rejected with a specific message', await ev(`return $('#f-email-error')?.textContent.includes('UMass email') && $('[role=alert]').textContent.includes('1 field needs attention') && ls('myclubs:profile') === null`));
+  await fill({ email: 'jlee@umass.edu', major: 'Economics', minor: 'Mathematics', classYear: '2029', github: 'github.com/jordanlee', portfolio: 'jordan.dev', experience: 'Treasurer of a robotics club.' });
+  await click(`byText('main button', 'Save profile')`);
+  await reload();
+  check(A, 'profile saved and restored after refresh', await ev(`const p = ls('myclubs:profile'); return p.fullName === 'Jordan Lee' && p.github === 'https://github.com/jordanlee' && p.portfolio === 'https://jordan.dev' && $('#f-major').value === 'Economics'`));
+  await setFile('default-resume.pdf', `'%PDF-1.4 DEFAULT-MARKER'`);
+  await waitFor(`$('[data-testid=resume-attached]')?.textContent.includes('default-resume.pdf')`);
+  check(A, 'default résumé saved explicitly (IndexedDB) and listed in the profile', (await idb('__default__')) === 'default-resume.pdf' && (await ev(`return ls('myclubs:profile').resume?.name === 'default-resume.pdf'`)));
+
+  // Prefill a new application; overriding it doesn't change the profile.
+  await goto('/clubs/applications/bestbuddies/apply');
+  check(A, 'new application prefilled from the profile', await ev(`return $('#f-fullName').value === 'Jordan Lee' && $('#f-email').value === 'jlee@umass.edu' && $('#f-classYear').value === '2029' && !!$('[data-testid=prefilled]')`));
+  await fill({ fullName: 'Jordan L.' });
+  await waitFor(`$('[data-testid=save-state]').textContent.startsWith('Saved')`, 3000);
+  check(A, 'editing a prefilled answer leaves the profile unchanged', (await stored('bestbuddies'))?.form?.values?.fullName === 'Jordan L.' && (await ev(`return ls('myclubs:profile').fullName === 'Jordan Lee'`)));
+  // Saved answers are never replaced by the profile; filling only fills blanks.
+  await goto('/clubs/applications/demo-org/apply');
+  check(A, 'existing application is not prefilled over', await ev(`return $('#f-fullName').value === 'Existing Name' && !$('[data-testid=prefilled]')`));
+  await click(`byText('main button', 'Fill empty fields from my profile')`);
+  check(A, '"Fill empty fields" fills blanks only', await ev(`return $('#f-fullName').value === 'Existing Name' && $('#f-major').value === 'History' && $('#f-minor').value === 'Mathematics' && $('[data-testid=form-notice]').textContent.includes('Nothing you typed was changed')`));
+
+  // Reuse the default résumé (by reference), then override it for one application.
+  await goto('/clubs/applications/bestbuddies/apply');
+  await toStep('Résumé & professional links');
+  await click(`byText('main button', 'Use my saved résumé')`);
+  await waitFor(`$('[data-testid=resume-attached]')`);
+  check(A, 'saved résumé reused without copying the file', await ev(`return $('[data-testid=resume-attached]').textContent.includes('your saved résumé')`) && (await stored('bestbuddies'))?.form?.resume?.source === 'default' && (await idb('bestbuddies')) === null);
+  await ev(`window.__opened = []; window.open = (u) => { window.__opened.push(u); return { opener: {} }; }; return true`);
+  await click(`byText('[data-testid=resume-attached] button', 'View')`);
+  check(A, 'viewing the reused résumé opens the default file', (await ev(`const u = window.__opened[0]; return u ? await (await fetch(u)).text() : ''`)).includes('DEFAULT-MARKER'));
+  await setFile('bb-only.pdf', `'%PDF-1.4 BB-ONLY'`);
+  await waitFor(`$('[data-testid=resume-attached]')?.textContent.includes('bb-only.pdf')`);
+  check(A, 'a different PDF for one application leaves the default intact', (await idb('bestbuddies')) === 'bb-only.pdf' && (await idb('__default__')) === 'default-resume.pdf' && !(await stored('bestbuddies'))?.form?.resume?.source);
+
+  // Audition template details on the official profile.
+  await goto('/clubs/discover/comedyleague');
+  check(A, 'audition club: schedule shown as not listed (nothing invented)', await ev(`return $('main aside').textContent.includes('Auditions: Audition schedule not listed')`));
+
+  // Structured decision (self-reported).
+  await click(`byText('main article > header button', 'Apply')`);
+  await waitFor(`location.pathname === '/clubs/applications/comedyleague/apply'`);
+  await goto('/clubs/applications/comedyleague');
+  await ev(`typeInto($('main form select'), 'decision'); return true`);
+  await waitFor(`[...$$('main select')].some((s) => [...s.options].some((o) => o.value === 'waitlisted'))`);
+  await ev(`const s = [...$$('main select')].find((x) => [...x.options].some((o) => o.value === 'waitlisted')); typeInto(s, 'waitlisted'); typeInto($('main input[placeholder^="e.g. Invited"]'), 'Callback next week'); return true`);
+  await click(`byText('main button', 'Save tracker')`);
+  check(A, 'decision saved as a structured outcome with a note', await ev(`const a = ls('myclubs:applications').find((x) => x.clubId === 'comedyleague'); return a.status === 'decision' && a.decision === 'waitlisted' && a.decisionNote === 'Callback next week' && $('main').textContent.includes('Decision: Waitlisted (self-reported)')`));
+  await goto('/clubs/applications');
+  check(A, 'My Applications shows the outcome as self-reported', await ev(`const c = cards().find((x) => x.textContent.includes('Comedy League')); return c.textContent.includes('Waitlisted (self-reported) — Callback next week')`));
+
+  // Migration of data saved by earlier versions.
+  await ev(`const n = new Date().toISOString(); const list = ls('myclubs:applications'); list.push({ clubId: 'umoc', status: 'decision', reminder: '2026-11-18', decisionNote: 'Got in!', createdAt: n, updatedAt: n }, { clubId: 'chessclub', status: 'interested', reminder: 'not-a-date', createdAt: n, updatedAt: n }); localStorage.setItem('myclubs:applications', JSON.stringify(list)); return true`);
+  await reload();
+  check(A, 'old free-text decision kept as the note (outcome "Other")', await ev(`const c = cards().find((x) => x.textContent.includes('Outing Club')); return c.textContent.includes('Decision: Other (self-reported)') && c.textContent.includes('Other (self-reported) — Got in!')`));
+  check(A, 'old single reminder becomes a date; bad dates dropped safely', await ev(`const c = cards().find((x) => x.textContent.includes('Outing Club')); const chess = cards().find((x) => x.textContent.includes('Chess Club')); return c.textContent.includes('Reminder · Wed, Nov 18, 2026') && !!chess && !chess.textContent.includes('Next date')`));
+
+  // Calendar: add, view (agenda, week, month), open, edit, delete.
+  await goto('/clubs/applications/comedyleague');
+  await ev(`typeInto($('[data-testid=date-kind]'), 'audition'); typeInto($('[data-testid=date-date]'), '2026-11-18'); typeInto($('[data-testid=date-time]'), '18:30'); typeInto($('[data-testid=date-note]'), 'Bring a 1-minute piece'); return true`);
+  await click(`byText('main button', 'Add date')`);
+  check(A, 'date added and labeled as entered by you', await ev(`const l = $('ul[aria-label="Your application dates"]'); return !!l && l.textContent.includes('Audition') && l.textContent.includes('18:30') && l.textContent.includes('(you entered this)')`));
+  await goto('/clubs/campus-life');
+  await click(`byText('main [aria-label="Calendar view"] button', 'Agenda')`);
+  const agendaItem = `$$('main section[aria-labelledby^="day-"]').find((s) => s.querySelector('h3').textContent.includes('November 18'))`;
+  check(A, 'agenda shows the audition once, at its time', await ev(`const s = ${agendaItem}; if (!s) return false; const b = $$('button', s).filter((x) => x.textContent.trim() === 'Audition: Comedy League'); return b.length === 1 && s.textContent.includes('6:30 PM')`));
+  check(A, 'agenda shows the migrated reminder as an all-day item', await ev(`const s = ${agendaItem}; return !!s && s.textContent.includes('Reminder: Outing Club') && s.textContent.includes('All day')`));
+  check(A, 'application dates have their own filter tile', await ev(`return $$('main button[aria-pressed]').some((b) => b.textContent.includes('Application dates'))`));
+  await click(`$$('main button').find((b) => b.textContent.trim() === 'Audition: Comedy League')`);
+  check(A, 'details: entered by you, not a booking, links to the application', await ev(`const d = $('dialog[open]'); return !!d && d.textContent.includes('You entered this date yourself') && d.textContent.includes('does not book') && !!byText('a', 'Open application', d)`));
+  await click(`byText('dialog[open] a', 'Open application')`);
+  check(A, 'calendar item opens the application', await waitFor(`location.pathname === '/clubs/applications/comedyleague'`));
+  await goto('/clubs/campus-life');
+  await click(`byText('main [aria-label="Calendar view"] button', 'Week')`);
+  await click(`$('main button[aria-label="Next week"]')`);
+  check(A, 'week view shows the audition', await ev(`return $$('main button').some((b) => (b.getAttribute('aria-label') ?? '').startsWith('Audition: Comedy League'))`));
+  await click(`byText('main [aria-label="Calendar view"] button', 'Month')`);
+  check(A, 'month view shows application dates (all-day reminder first in its cell)', await ev(`return $$('main button').some((b) => (b.getAttribute('aria-label') ?? '').startsWith('Reminder: Outing Club') && b.textContent.includes('All day'))`));
+  check(A, 'application dates never count as conflicts', await ev(`return !$$('main button').some((b) => (b.getAttribute('aria-label') ?? '').startsWith('Audition: Comedy League') && b.getAttribute('aria-label').includes('Schedule conflict'))`));
+
+  // Dashboard To Do.
+  await goto('/');
+  check(A, 'To Do lists application tasks, labeled as MyClubs (not Canvas)', await ev(`const t = $('[data-testid=todo-applications]'); return !!t && t.textContent.includes('Audition: Comedy League') && t.textContent.includes('Reminder: Outing Club') && t.textContent.includes('From MyClubs — not Canvas assignments.')`));
+  check(A, 'To Do keeps the academic demo items', await ev(`return $$('aside[aria-label="To Do and upcoming"] > ul li').length > 0`));
+  check(A, 'To Do shows unfinished drafts', await ev(`return $('[data-testid=todo-applications]').textContent.includes('Finish application draft:')`));
+  await click(`byText('[data-testid=todo-applications] a', 'Audition: Comedy League')`);
+  check(A, 'To Do item opens the application', await waitFor(`location.pathname === '/clubs/applications/comedyleague'`));
+
+  // Edit and delete update the calendar immediately.
+  await click(`byText('main button', 'Edit Audition')`);
+  await ev(`typeInto($('[data-testid=date-time]'), '19:00'); return true`);
+  await click(`byText('main button', 'Save date')`);
+  await goto('/clubs/campus-life');
+  await click(`byText('main [aria-label="Calendar view"] button', 'Agenda')`);
+  check(A, 'edited date updates the calendar', await ev(`const s = ${agendaItem}; return !!s && s.textContent.includes('7:00 PM') && !s.textContent.includes('6:30 PM')`));
+  await goto('/clubs/applications/comedyleague');
+  await click(`byText('main button', 'Delete Audition')`);
+  await goto('/clubs/campus-life');
+  await click(`byText('main [aria-label="Calendar view"] button', 'Agenda')`);
+  check(A, 'deleted date leaves the calendar', await ev(`const s = ${agendaItem}; return !!s && !s.textContent.includes('Audition: Comedy League')`));
+
+  // Delete the profile: profile and default résumé go; applications keep their answers.
+  await goto('/clubs/applications/profile');
+  await click(`byText('main button', 'Delete profile')`);
+  await sleep(300);
+  check(A, 'delete profile removes it and the default résumé', (await ev(`return ls('myclubs:profile')`)) === null && (await idb('__default__')) === null);
+  check(A, 'applications keep their own answers after profile deletion', (await stored('bestbuddies'))?.form?.values?.fullName === 'Jordan L.');
+
+  for (const p of ['/clubs/applications/profile', '/clubs/applications/comedyleague', '/clubs/campus-life', '/']) {
+    await viewport(375, 812);
+    await goto(p);
+    check(A, `no horizontal scroll at 375px: ${p}`, await ev(`return document.documentElement.scrollWidth <= 375`));
+  }
   await viewport(1440);
   await goto('/');
   await ev(`localStorage.clear(); return true`);

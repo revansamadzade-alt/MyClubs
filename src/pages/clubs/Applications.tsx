@@ -4,7 +4,8 @@ import { ClipboardList, ExternalLink } from 'lucide-react';
 import type { TrackedApplication } from '../../types';
 import { CLUBS } from '../../data/clubs';
 import { useStore } from '../../context/StoreContext';
-import { DEMO_ORG, DEMO_ORG_ID, fmtDay, fmtStamp, isDemoOrg, orgFor } from '../../lib/applications';
+import { DECISION_LABEL, DEMO_ORG, DEMO_ORG_ID, fmtDay, fmtStamp, isDemoOrg, orgFor } from '../../lib/applications';
+import { DATE_KIND_LABEL, nextDate } from '../../lib/applicationPlanner';
 import { MembershipTag, ProgressSteps, StatusPill } from '../../components/Applications';
 import { ClubAvatar, EmptyState, PageHeader, SampleBadge } from '../../components/ui';
 import { useTitle } from '../../hooks/useTitle';
@@ -24,6 +25,7 @@ function ApplicationCard({ app }: { app: TrackedApplication }) {
   const official = club.application?.applyUrl;
   const required = club.application?.process === 'required';
   const prepared = !!app.form?.preparedAt && app.status !== 'draft';
+  const upcoming = nextDate(app);
   return (
     <article className="card flex flex-col p-4" aria-labelledby={`app-${club.id}`}>
       <div className="flex items-start gap-3">
@@ -44,9 +46,10 @@ function ApplicationCard({ app }: { app: TrackedApplication }) {
       <ProgressSteps app={app} />
       <dl className="mt-3 space-y-1 text-sm">
         <Row label="Deadline">{club.application?.deadline ? fmtDay(club.application.deadline) : 'Deadline not listed'}</Row>
-        {app.reminder && (
-          <Row label="Reminder">
-            {fmtDay(app.reminder)} <span className="text-ink-soft">(you entered this)</span>
+        {upcoming && (
+          <Row label="Next date">
+            {DATE_KIND_LABEL[upcoming.kind]} · {fmtDay(upcoming.date)}
+            {upcoming.time ? ` · ${upcoming.time}` : ''} <span className="text-ink-soft">(you entered this)</span>
           </Row>
         )}
         <Row label="Link">
@@ -73,7 +76,11 @@ function ApplicationCard({ app }: { app: TrackedApplication }) {
             )}
           </Row>
         )}
-        {app.decisionNote && <Row label="Decision">{app.decisionNote} (self-reported)</Row>}
+        {app.status === 'decision' && app.decision && (
+          <Row label="Decision">
+            {DECISION_LABEL[app.decision]} (self-reported){app.decisionNote ? ` — ${app.decisionNote}` : ''}
+          </Row>
+        )}
         {app.notes && <Row label="Notes">{app.notes.length > 90 ? `${app.notes.slice(0, 90)}…` : app.notes}</Row>}
       </dl>
       <div className="mt-auto flex flex-wrap gap-2 pt-4">
@@ -96,7 +103,7 @@ function ApplicationCard({ app }: { app: TrackedApplication }) {
 
 export default function Applications() {
   useTitle('Applications');
-  const { applications } = useStore();
+  const { applications, profile } = useStore();
   const demo = applications.find((a) => a.clubId === DEMO_ORG_ID);
   const tracked = applications.filter((a) => orgFor(a.clubId)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const requiredCount = CLUBS.filter((c) => c.application?.process === 'required').length;
@@ -112,6 +119,22 @@ export default function Applications() {
           </Link>
         }
       />
+
+      <section aria-labelledby="profile-card" className="mb-6 flex flex-wrap items-center gap-4 rounded border border-line bg-white p-4" data-testid="profile-card">
+        <div className="min-w-0 flex-1 basis-60">
+          <h2 id="profile-card" className="font-bold text-ink">
+            My applicant profile
+          </h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            {profile
+              ? `Saved ${fmtStamp(profile.updatedAt)}${profile.resume ? ` · default résumé: ${profile.resume.name}` : ''}. Used to fill in new application forms.`
+              : 'Optional: save your details and a default résumé once, then reuse them in new application forms. Stored only in this browser.'}
+          </p>
+        </div>
+        <Link to="/clubs/applications/profile" className="btn btn-secondary">
+          {profile ? 'Edit profile' : 'Create profile'}
+        </Link>
+      </section>
 
       {!demo && (
       <section aria-labelledby="demo-app" className="mb-6 flex flex-wrap items-center gap-4 rounded border border-dashed border-[#9aa5ad] bg-surface p-4">

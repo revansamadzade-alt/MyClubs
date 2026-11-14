@@ -69,9 +69,26 @@ export interface ApplicationInfo {
   template?: string;
   /** Questions quoted from the organization's official application, only when verified. */
   questions?: string[];
+  /** Official audition times or booking information, only when published. */
+  auditionInfo?: string;
+  auditionUrl?: string;
+  /** Last time `npm run check:membership` found the quoted evidence on the official page (YYYY-MM-DD). */
+  lastChecked?: string;
 }
 
 export type ApplicationStatus = 'interested' | 'draft' | 'prepared' | 'submitted' | 'decision';
+
+/** Self-reported outcome when status is "decision". */
+export type DecisionOutcome = 'pending' | 'accepted' | 'waitlisted' | 'not-accepted' | 'withdrawn' | 'other';
+
+/** Résumé attached to one application. `source: 'default'` points at the student's saved default résumé (no copy). */
+export interface ResumeMeta {
+  name: string;
+  size: number;
+  source?: 'default';
+  /** false when the browser could not store the file: it exists only until the page is refreshed. */
+  stored?: boolean;
+}
 
 /** In-app answers to the sample questionnaire. The résumé file itself lives in IndexedDB, keyed by clubId. */
 export interface ApplicationForm {
@@ -79,9 +96,24 @@ export interface ApplicationForm {
   values: Record<string, string>;
   /** Step to resume on (0-based; equal to the number of steps for the review screen). */
   step: number;
-  resume?: { name: string; size: number };
+  resume?: ResumeMeta;
   /** Set when the student finishes the demo application. Nothing is sent anywhere. */
   preparedAt?: string;
+  /** Increases with every save of the answers; used to detect edits made in another tab. */
+  rev?: number;
+}
+
+export type ApplicationDateKind = 'reminder' | 'interview' | 'audition';
+
+/** A date the student entered (reminder, or an interview/audition the organization told them about). */
+export interface ApplicationDate {
+  id: string;
+  kind: ApplicationDateKind;
+  /** YYYY-MM-DD */
+  date: string;
+  /** HH:MM (24h), optional */
+  time?: string;
+  note?: string;
 }
 
 /** A student's own application tracker entry. Everything here is self-reported; nothing is sent anywhere. */
@@ -90,13 +122,32 @@ export interface TrackedApplication {
   status: ApplicationStatus;
   /** Application link the student recorded themselves. */
   link?: string;
-  /** Personal reminder date (YYYY-MM-DD) the student entered — not an official deadline. */
+  /** Legacy single reminder (YYYY-MM-DD); migrated into `dates` when read. */
   reminder?: string;
+  /** Reminders, interviews and auditions the student entered. */
+  dates?: ApplicationDate[];
   notes?: string;
+  decision?: DecisionOutcome;
   decisionNote?: string;
   /** Answers to the in-app sample questionnaire. */
   form?: ApplicationForm;
   createdAt: string;
+  updatedAt: string;
+}
+
+/** Optional details reused to prefill application forms. Stored only in this browser; not an account. */
+export interface ApplicantProfile {
+  fullName?: string;
+  email?: string;
+  major?: string;
+  minor?: string;
+  classYear?: string;
+  github?: string;
+  linkedin?: string;
+  portfolio?: string;
+  experience?: string;
+  /** The default résumé saved in IndexedDB (explicitly chosen by the student). */
+  resume?: { name: string; size: number };
   updatedAt: string;
 }
 

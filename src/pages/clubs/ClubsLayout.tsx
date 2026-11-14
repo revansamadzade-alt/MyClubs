@@ -29,7 +29,9 @@ function crumbsFor(pathname: string): { label: string; to?: string }[] {
         : section === 'events'
           ? EVENT_BY_ID[id]?.title
           : section === 'applications'
-            ? orgFor(id)?.name
+            ? id === 'profile'
+              ? 'My applicant profile'
+              : orgFor(id)?.name
             : undefined;
     crumbs.push({ label: name ?? 'Not found', to: sub ? `/clubs/${section}/${id}` : undefined });
     if (sub === 'apply') crumbs.push({ label: 'Apply' });

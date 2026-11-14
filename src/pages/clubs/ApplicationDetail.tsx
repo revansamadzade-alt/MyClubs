@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, FileText, Info, SearchX } from 'lucide-react';
-import type { ApplicationStatus, Club, TrackedApplication } from '../../types';
+import type { ApplicationDate, ApplicationDateKind, ApplicationStatus, Club, DecisionOutcome, TrackedApplication } from '../../types';
 import { campusPulseLinks } from '../../data/clubs';
 import { useStore } from '../../context/StoreContext';
-import { STATUS_META, applicationsClosed, fmtStamp, isDemoOrg, isHttpUrl, orgFor } from '../../lib/applications';
+import { DECISION_LABEL, STATUS_META, applicationsClosed, fmtDay, fmtStamp, isDemoOrg, isHttpUrl, orgFor } from '../../lib/applications';
+import { DATE_KIND_LABEL, sortedDates } from '../../lib/applicationPlanner';
 import { buildForm, formatAnswers, restoreForm } from '../../lib/applicationForms';
 import { AnswerActions, MembershipInfo, ProgressSteps, StatusPill } from '../../components/Applications';
 import { CategoryTag, ClubAvatar, EmptyState, SampleBadge } from '../../components/ui';
@@ -55,6 +56,9 @@ function FormCard({ club, app }: { club: Club; app?: TrackedApplication }) {
       <p className="mt-1 text-sm text-ink-soft">
         {def.templateLabel} questions in {def.steps.length + 1} steps. {isDemoOrg(club) ? 'Demo only — not sent to the organization.' : 'For preparing your answers; not the official application.'}
       </p>
+      {applicationsClosed(club) && (
+        <p className="mt-2 text-sm font-bold text-badge">Applications are closed (verified). Your answers stay here for a future cycle.</p>
+      )}
       <p className="mt-3 text-sm text-ink">
         {!saved
           ? 'Not started.'
@@ -87,13 +91,130 @@ function FormCard({ club, app }: { club: Club; app?: TrackedApplication }) {
   );
 }
 
+const EMPTY_DATE = { kind: 'reminder' as ApplicationDateKind, date: '', time: '', note: '' };
+
+/** Reminders, interviews and auditions the student enters; they appear in My Campus Life and the Dashboard To Do. */
+function DatesEditor({ club, app }: { club: Club; app: TrackedApplication }) {
+  const { saveApplication } = useStore();
+  const [draft, setDraft] = useState(EMPTY_DATE);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const dates = sortedDates(app);
+
+  const write = (next: ApplicationDate[], message: string) => saveApplication(club.id, { dates: next }, message);
+  const submit = (e: { preventDefault: () => void }) => {
+    e.preventDefault();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) return setError('Choose a date.');
+    if (draft.time && !/^\d{2}:\d{2}$/.test(draft.time)) return setError('Enter a time like 18:30, or leave it empty.');
+    setError('');
+    const entry: ApplicationDate = {
+      id: editing ?? `d${Date.now().toString(36)}`,
+      kind: draft.kind,
+      date: draft.date,
+      ...(draft.time ? { time: draft.time } : {}),
+      ...(draft.note.trim() ? { note: draft.note.trim().slice(0, 120) } : {}),
+    };
+    const rest = (app.dates ?? []).filter((d) => d.id !== entry.id);
+    if (write([...rest, entry], editing ? 'Date updated. It shows in My Campus Life.' : 'Date added. It shows in My Campus Life.')) {
+      setDraft(EMPTY_DATE);
+      setEditing(null);
+    }
+  };
+  const edit = (d: ApplicationDate) => {
+    setEditing(d.id);
+    setDraft({ kind: d.kind, date: d.date, time: d.time ?? '', note: d.note ?? '' });
+  };
+  const remove = (d: ApplicationDate) => write((app.dates ?? []).filter((x) => x.id !== d.id), 'Date deleted.');
+
+  return (
+    <section className="card p-4" aria-labelledby="dates-heading">
+      <h2 id="dates-heading" className="font-bold text-ink">
+        Your dates
+      </h2>
+      <p className="mt-1 text-sm text-ink-soft">
+        Reminders, and interview or audition times the organization gave you. You enter these yourself; they are not official deadlines or
+        bookings. They appear in My Campus Life and the Dashboard To Do.
+      </p>
+      {dates.length > 0 && (
+        <ul className="mt-3 divide-y divide-line-soft text-sm" aria-label="Your application dates">
+          {dates.map((d) => (
+            <li key={d.id} className="flex flex-wrap items-center gap-2 py-2">
+              <span className="min-w-0 flex-1">
+                <strong>{DATE_KIND_LABEL[d.kind]}</strong> · {fmtDay(d.date)}
+                {d.time ? ` · ${d.time}` : ''}
+                {d.note ? ` · ${d.note}` : ''} <span className="text-ink-soft">(you entered this)</span>
+              </span>
+              <button type="button" onClick={() => edit(d)} className="btn btn-ghost btn-sm">
+                Edit<span className="sr-only"> {DATE_KIND_LABEL[d.kind]} on {d.date}</span>
+              </button>
+              <button type="button" onClick={() => remove(d)} className="btn btn-ghost btn-sm">
+                Delete<span className="sr-only"> {DATE_KIND_LABEL[d.kind]} on {d.date}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form onSubmit={submit} noValidate className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[auto_auto_auto_minmax(0,1fr)] sm:items-end" aria-label={editing ? 'Edit date' : 'Add a date'}>
+        <label className="block text-sm">
+          <span className="mb-1 block font-bold">Type</span>
+          <select value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as ApplicationDateKind })} className="input" data-testid="date-kind">
+            {(Object.keys(DATE_KIND_LABEL) as ApplicationDateKind[]).map((k) => (
+              <option key={k} value={k}>
+                {DATE_KIND_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block font-bold">Date</span>
+          <input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} className="input" data-testid="date-date" />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block font-bold">
+            Time <span className="font-normal text-ink-soft">(optional)</span>
+          </span>
+          <input type="time" value={draft.time} onChange={(e) => setDraft({ ...draft, time: e.target.value })} className="input" data-testid="date-time" />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block font-bold">
+            Note <span className="font-normal text-ink-soft">(optional)</span>
+          </span>
+          <input value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} maxLength={120} className="input" data-testid="date-note" />
+        </label>
+        {error && (
+          <p role="alert" className="text-sm font-bold text-badge sm:col-span-4">
+            {error}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2 sm:col-span-4">
+          <button type="submit" className="btn btn-secondary btn-sm">
+            {editing ? 'Save date' : 'Add date'}
+          </button>
+          {editing && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(null);
+                setDraft(EMPTY_DATE);
+              }}
+              className="btn btn-ghost btn-sm"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </form>
+    </section>
+  );
+}
+
 function TrackerForm({ club, app }: { club: Club; app: TrackedApplication }) {
   const { saveApplication, removeApplication } = useStore();
   const navigate = useNavigate();
   const [status, setStatus] = useState<ApplicationStatus>(app.status);
   const [link, setLink] = useState(app.link ?? '');
-  const [reminder, setReminder] = useState(app.reminder ?? '');
   const [notes, setNotes] = useState(app.notes ?? '');
+  const [decision, setDecision] = useState<DecisionOutcome>(app.decision ?? 'pending');
   const [decisionNote, setDecisionNote] = useState(app.decisionNote ?? '');
   const [error, setError] = useState('');
 
@@ -106,8 +227,8 @@ function TrackerForm({ club, app }: { club: Club; app: TrackedApplication }) {
       {
         status,
         link: link.trim() || undefined,
-        reminder: reminder || undefined,
         notes: notes.trim() || undefined,
+        decision: status === 'decision' ? decision : undefined,
         decisionNote: status === 'decision' ? decisionNote.trim() || undefined : undefined,
       },
       'Application tracker saved.',
@@ -132,23 +253,35 @@ function TrackerForm({ club, app }: { club: Club; app: TrackedApplication }) {
             </option>
           ))}
         </select>
-        <span className="mt-1 block text-xs text-ink-soft">You update this yourself. MyClubs never submits applications or receives decisions.</span>
+        <span className="mt-1 block text-xs text-ink-soft">
+          You update this yourself. “Submitted externally” means you applied through the organization's own process. MyClubs never submits
+          applications or receives decisions.
+        </span>
       </label>
       {status === 'decision' && (
-        <label className="block">
-          <span className="mb-1 block text-sm font-bold">Decision (self-reported)</span>
-          <input value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} maxLength={120} className="input" placeholder="e.g. Invited to audition" />
-        </label>
+        <fieldset className="space-y-3 rounded border border-line-soft p-3">
+          <legend className="px-1 text-sm font-bold">Decision (self-reported)</legend>
+          <label className="block">
+            <span className="mb-1 block text-sm">Outcome</span>
+            <select value={decision} onChange={(e) => setDecision(e.target.value as DecisionOutcome)} className="input sm:w-64">
+              {(Object.keys(DECISION_LABEL) as DecisionOutcome[]).map((d) => (
+                <option key={d} value={d}>
+                  {DECISION_LABEL[d]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm">Note (optional)</span>
+            <input value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} maxLength={120} className="input" placeholder="e.g. Invited to a second audition" />
+          </label>
+          <span className="block text-xs text-ink-soft">Only you can see this. Neither the university nor the organization has confirmed it.</span>
+        </fieldset>
       )}
       <label className="block">
         <span className="mb-1 block text-sm font-bold">Application link you found</span>
         <input type="url" value={link} onChange={(e) => setLink(e.target.value)} className="input" placeholder="https://" inputMode="url" />
         <span className="mt-1 block text-xs text-ink-soft">Record the organization's official link, e.g. from its Campus Pulse page or website.</span>
-      </label>
-      <label className="block">
-        <span className="mb-1 block text-sm font-bold">Personal reminder date</span>
-        <input type="date" value={reminder} onChange={(e) => setReminder(e.target.value)} className="input sm:w-56" />
-        <span className="mt-1 block text-xs text-ink-soft">Your own reminder — not an official deadline.</span>
       </label>
       <label className="block">
         <span className="mb-1 block text-sm font-bold">Notes</span>
@@ -229,7 +362,10 @@ export default function ApplicationDetail() {
           </section>
           {required && <FormCard club={club} app={app} />}
           {app ? (
-            <TrackerForm key={app.updatedAt} club={club} app={app} />
+            <>
+              <TrackerForm key={`${app.status}|${app.decision ?? ''}|${app.decisionNote ?? ''}|${app.link ?? ''}|${app.notes ?? ''}`} club={club} app={app} />
+              <DatesEditor club={club} app={app} />
+            </>
           ) : (
             <div className="card p-5">
               <h2 className="font-bold text-ink">Track this application</h2>

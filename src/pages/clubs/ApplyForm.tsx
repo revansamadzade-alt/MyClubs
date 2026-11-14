@@ -1,27 +1,33 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, BadgeCheck, ExternalLink, Info, SearchX } from 'lucide-react';
-import type { ApplicationForm, Club } from '../../types';
-import { useStore } from '../../context/StoreContext';
+import { ArrowLeft, BadgeCheck, ExternalLink, Info, SearchX, TriangleAlert } from 'lucide-react';
+import type { ApplicationForm, Club, ResumeMeta } from '../../types';
+import { readStoredApplication, useStore } from '../../context/StoreContext';
 import { campusPulseLinks } from '../../data/clubs';
 import {
   buildForm,
   cleanValues,
   formatAnswers,
+  prefillFromProfile,
   restoreForm,
+  templateFor,
   validateField,
   validateStep,
   type ApplicationFormDef,
   type FieldDef,
 } from '../../lib/applicationForms';
 import { applicationsClosed, draftStatus, fmtDay, fmtStamp, isDemoOrg, orgFor, preparedStatus } from '../../lib/applications';
-import { AnswerActions, FieldTag, MembershipTag, ProgressSteps, StatusPill } from '../../components/Applications';
+import { AnswerActions, MembershipTag, ProgressSteps, StatusPill } from '../../components/Applications';
+import { Field, fieldId } from '../../components/FormField';
 import { ResumeUpload } from '../../components/ResumeUpload';
 import { CategoryTag, ClubAvatar, EmptyState, SampleBadge } from '../../components/ui';
 import { useTitle } from '../../hooks/useTitle';
 import { cx } from '../../lib/cx';
 
-const fieldId = (id: string) => `f-${id}`;
+/** Typing is saved this long after the last keystroke; blur, step changes and leaving the page save at once. */
+const AUTOSAVE_MS = 400;
+
+type SaveState = 'idle' | 'pending' | 'saved' | 'error' | 'conflict';
 
 export default function ApplyForm() {
   const { clubId = '' } = useParams();
@@ -61,6 +67,7 @@ function Notice({ club }: { club: Club }) {
       </div>
     );
   const a = club.application!;
+  const closed = applicationsClosed(club);
   return (
     <div role="note" className="mb-5 flex gap-2 rounded border border-[#b3d7ee] bg-[#eef6fb] p-4 text-sm text-ink">
       <Info size={18} aria-hidden className="mt-0.5 shrink-0 text-link" />
@@ -75,8 +82,17 @@ function Notice({ club }: { club: Club }) {
         </p>
         <p className="mt-1">
           <strong>Deadline:</strong> {a.deadline ? fmtDay(a.deadline) : 'Deadline not listed'}
-          {applicationsClosed(club) && <strong className="text-badge"> · Applications closed</strong>} · <strong>Official application:</strong>{' '}
-          {a.applyUrl ? (
+          {closed && <strong className="text-badge"> · Applications closed (verified)</strong>}
+          {templateFor(club) === 'audition' && (
+            <>
+              {' '}
+              · <strong>Auditions:</strong> {a.auditionInfo ?? 'Audition schedule not listed'}
+            </>
+          )}{' '}
+          · <strong>Official application:</strong>{' '}
+          {closed ? (
+            'closed'
+          ) : a.applyUrl ? (
             <a href={a.applyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-link hover:underline">
               Open official application <ExternalLink size={12} aria-hidden />
               <span className="sr-only"> (opens in a new tab)</span>
@@ -85,65 +101,11 @@ function Notice({ club }: { club: Club }) {
             'Application link not available'
           )}
         </p>
-        <p className="mt-1 text-ink-soft">Use this form to prepare your answers. MyClubs never submits anything; answers stay in this browser.</p>
-      </div>
-    </div>
-  );
-}
-
-function Field({ f, value, error, onChange, onBlur }: { f: FieldDef; value: string; error?: string; onChange: (v: string) => void; onBlur: () => void }) {
-  const id = fieldId(f.id);
-  const describedBy = [f.help && `${id}-help`, error && `${id}-error`].filter(Boolean).join(' ') || undefined;
-  const common = {
-    id,
-    value,
-    onBlur,
-    'aria-invalid': error ? true : undefined,
-    'aria-describedby': describedBy,
-    'aria-required': f.required || undefined,
-  };
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-bold text-ink">
-        {f.official && <span className="mr-1.5 rounded bg-[#eef6fb] px-1.5 py-0.5 text-xs text-link">From the official application</span>}
-        {f.label} <FieldTag required={f.required} />
-      </label>
-      {f.kind === 'textarea' ? (
-        <textarea {...common} rows={(f.max ?? 0) >= 1000 ? 6 : 4} maxLength={f.max} onChange={(e) => onChange(e.target.value)} className="input resize-y" />
-      ) : f.kind === 'select' ? (
-        <select {...common} onChange={(e) => onChange(e.target.value)} className="input">
-          <option value="">Choose…</option>
-          {f.options?.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <input
-          {...common}
-          type={f.kind === 'email' ? 'email' : f.kind === 'url' ? 'url' : 'text'}
-          inputMode={f.kind === 'url' ? 'url' : f.kind === 'email' ? 'email' : undefined}
-          autoComplete={f.autoComplete ?? 'off'}
-          placeholder={f.placeholder}
-          maxLength={f.max}
-          onChange={(e) => onChange(e.target.value)}
-          className="input"
-        />
-      )}
-      <div className="mt-1 flex gap-3 text-xs text-ink-soft">
-        {f.help && <span id={`${id}-help`}>{f.help}</span>}
-        {f.kind === 'textarea' && f.max && (
-          <span className="ml-auto shrink-0 tabular-nums" aria-hidden>
-            {value.length}/{f.max}
-          </span>
-        )}
-      </div>
-      {error && (
-        <p id={`${id}-error`} className="mt-1 text-sm font-bold text-badge">
-          {error}
+        <p className="mt-1 text-ink-soft">
+          Use this form to prepare your answers. MyClubs never submits anything; answers stay in this browser. Following a club is not membership,
+          and finishing this form doesn't apply for you.
         </p>
-      )}
+      </div>
     </div>
   );
 }
@@ -166,7 +128,10 @@ function Stepper({ labels, current }: { labels: string[]; current: number }) {
   );
 }
 
-function ReviewList({ def, values, resumeName, onEdit }: { def: ApplicationFormDef; values: Record<string, string>; resumeName?: string; onEdit?: (i: number) => void }) {
+const resumeText = (r?: ResumeMeta) =>
+  r ? `${r.name}${r.stored === false ? ' (this visit only; not stored)' : r.source === 'default' ? ' (your saved résumé)' : ''}` : undefined;
+
+function ReviewList({ def, values, resume, onEdit }: { def: ApplicationFormDef; values: Record<string, string>; resume?: ResumeMeta; onEdit?: (i: number) => void }) {
   return (
     <div className="divide-y divide-line-soft">
       {def.steps.map((s, i) => (
@@ -183,7 +148,7 @@ function ReviewList({ def, values, resumeName, onEdit }: { def: ApplicationFormD
           </div>
           <dl className="space-y-2 text-sm">
             {s.fields.map((f) => {
-              const v = f.kind === 'file' ? resumeName : values[f.id]?.trim();
+              const v = f.kind === 'file' ? resumeText(resume) : values[f.id]?.trim();
               return (
                 <div key={f.id}>
                   <dt className="text-ink-soft">{f.label}</dt>
@@ -200,23 +165,71 @@ function ReviewList({ def, values, resumeName, onEdit }: { def: ApplicationFormD
   );
 }
 
+/** Announces this form to other tabs showing the same application, and counts the other tabs that have it open. */
+function useOtherTabs(clubId: string): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const tab = Math.random().toString(36).slice(2);
+    const channel = new BroadcastChannel('myclubs-apply');
+    const others = new Set<string>();
+    channel.onmessage = (e: MessageEvent) => {
+      const m = e.data as { type?: string; clubId?: string; tab?: string } | null;
+      if (!m || m.clubId !== clubId || !m.tab || m.tab === tab) return;
+      if (m.type === 'hello') {
+        others.add(m.tab);
+        channel.postMessage({ type: 'here', clubId, tab });
+      } else if (m.type === 'here') others.add(m.tab);
+      else if (m.type === 'bye') others.delete(m.tab);
+      setCount(others.size);
+    };
+    channel.postMessage({ type: 'hello', clubId, tab });
+    const bye = () => channel.postMessage({ type: 'bye', clubId, tab });
+    window.addEventListener('pagehide', bye);
+    return () => {
+      bye();
+      window.removeEventListener('pagehide', bye);
+      channel.close();
+    };
+  }, [clubId]);
+  return count;
+}
+
 function Wizard({ club }: { club: Club }) {
-  const { getApplication, saveApplication } = useStore();
+  const { getApplication, saveApplication, profile } = useStore();
   const [params] = useSearchParams();
   const def = useMemo(() => buildForm(club), [club]);
   const app = getApplication(club.id);
-  const [initial] = useState(() => restoreForm(def, app?.form));
   const REVIEW = def.steps.length;
   const DONE = REVIEW + 1;
   const demo = isDemoOrg(club);
+  const closed = applicationsClosed(club);
 
+  const [initial] = useState(() => {
+    const restored = restoreForm(def, app?.form);
+    // A new application starts from the applicant profile; saved answers are never replaced by it.
+    const prefill = app?.form ? {} : prefillFromProfile(def, profile);
+    return { ...restored, values: { ...prefill, ...restored.values }, prefilled: Object.keys(prefill).length > 0, rev: app?.form?.rev ?? 0 };
+  });
   const [values, setValues] = useState(initial.values);
-  const [resume, setResume] = useState(initial.resume);
+  const [resume, setResume] = useState<ResumeMeta | undefined>(initial.resume);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [dirty, setDirty] = useState(false);
   const [step, setStep] = useState(() =>
     params.get('view') === 'review' ? REVIEW : initial.preparedAt && app?.status !== 'draft' ? DONE : Math.min(initial.step, REVIEW),
   );
+  const [save, setSave] = useState<SaveState>(app?.form ? 'saved' : 'idle');
+  const [savedAt, setSavedAt] = useState<string | undefined>(app?.form ? app.updatedAt : undefined);
+  const [notice, setNotice] = useState('');
+  const otherTabs = useOtherTabs(club.id);
+
+  // Mirrors of the latest state for event handlers that run outside React (pagehide, timers).
+  const valuesRef = useRef(values);
+  const resumeRef = useRef(resume);
+  const stepRef = useRef(step);
+  const dirty = useRef(false);
+  const conflict = useRef(false);
+  const baseRev = useRef(initial.rev);
+  const timer = useRef<number | undefined>(undefined);
   const focusTarget = useRef<string | null>(null);
 
   useEffect(() => {
@@ -225,36 +238,118 @@ function Wizard({ club }: { club: Club }) {
     focusTarget.current = null;
   });
 
-  const snapshot = (over: Partial<ApplicationForm> = {}): ApplicationForm => ({
-    template: def.template,
-    values: cleanValues(def, values),
-    step: Math.min(step, REVIEW),
-    resume,
-    preparedAt: undefined,
-    ...over,
-  });
+  /**
+   * Writes the answers now (synchronously, to localStorage). Refuses to overwrite answers another tab saved since
+   * this tab last loaded or saved them: that becomes a visible conflict instead of a silent overwrite.
+   */
+  const flush = useCallback(
+    (over?: Partial<ApplicationForm>, message?: string): boolean => {
+      window.clearTimeout(timer.current);
+      if (conflict.current) return false;
+      if (!dirty.current && !over && !message) return true;
+      const stored = readStoredApplication(club.id);
+      const storedRev = stored?.form?.rev ?? 0;
+      if (storedRev > baseRev.current) {
+        conflict.current = true;
+        setSave('conflict');
+        return false;
+      }
+      const r = resumeRef.current;
+      const form: ApplicationForm = {
+        template: def.template,
+        values: cleanValues(def, valuesRef.current),
+        step: Math.min(stepRef.current, REVIEW),
+        // A résumé the browser couldn't store is not recorded, so a refresh never claims a file that's gone.
+        resume: r && r.stored !== false ? { name: r.name, size: r.size, ...(r.source ? { source: r.source } : {}) } : undefined,
+        preparedAt: undefined,
+        ...over,
+        rev: storedRev + 1,
+      };
+      const status = form.preparedAt ? preparedStatus(stored?.status) : draftStatus(stored?.status);
+      const ok = saveApplication(club.id, { status, form }, message);
+      if (ok) {
+        baseRev.current = storedRev + 1;
+        dirty.current = false;
+        setSave('saved');
+        setSavedAt(new Date().toISOString());
+      } else setSave('error');
+      return ok;
+    },
+    [club.id, def, REVIEW, saveApplication],
+  );
 
-  const persist = (over: Partial<ApplicationForm> = {}, message?: string) => {
-    saveApplication(club.id, { status: draftStatus(getApplication(club.id)?.status), form: snapshot(over) }, message);
-    setDirty(false);
+  const schedule = () => {
+    dirty.current = true;
+    if (conflict.current) return;
+    setSave('pending');
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => flush(), AUTOSAVE_MS);
   };
 
-  // Autosave typing after a short pause, and on leaving the page, so a refresh never loses much.
+  // Save before the page is hidden, refreshed, closed or left. localStorage writes are synchronous, so this lands.
   useEffect(() => {
-    if (!dirty) return;
-    const t = setTimeout(() => persist(), 1200);
-    return () => clearTimeout(t);
-  });
-  const leave = useRef<() => void>(() => {});
-  leave.current = () => dirty && persist();
-  useEffect(() => () => leave.current(), []);
+    const now = () => void flush();
+    const onVisibility = () => document.visibilityState === 'hidden' && flush();
+    window.addEventListener('pagehide', now);
+    window.addEventListener('beforeunload', now);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', now);
+      window.removeEventListener('beforeunload', now);
+      document.removeEventListener('visibilitychange', onVisibility);
+      flush();
+    };
+  }, [flush]);
+
+  const loadStored = useCallback(() => {
+    const stored = readStoredApplication(club.id);
+    const r = restoreForm(def, stored?.form);
+    valuesRef.current = r.values;
+    resumeRef.current = r.resume;
+    setValues(r.values);
+    setResume(r.resume);
+    setErrors({});
+    baseRev.current = stored?.form?.rev ?? 0;
+    conflict.current = false;
+    dirty.current = false;
+    window.clearTimeout(timer.current);
+    setSave(stored?.form ? 'saved' : 'idle');
+    setSavedAt(stored?.updatedAt);
+  }, [club.id, def]);
+
+  // Another tab saved newer answers: take them if nothing here is unsaved, otherwise ask.
+  const storedRev = app?.form?.rev ?? 0;
+  useEffect(() => {
+    if (storedRev <= baseRev.current) return;
+    if (!dirty.current) {
+      loadStored();
+      setNotice('Loaded the latest answers saved in another tab.');
+    } else {
+      conflict.current = true;
+      setSave('conflict');
+    }
+  }, [storedRev, loadStored]);
+
+  const keepMine = () => {
+    baseRev.current = readStoredApplication(club.id)?.form?.rev ?? 0;
+    conflict.current = false;
+    dirty.current = true;
+    flush(undefined, 'Kept the answers from this tab.');
+  };
+  const takeTheirs = () => {
+    loadStored();
+    setNotice('Loaded the answers saved in the other tab. Your unsaved edits here were discarded.');
+  };
 
   const setValue = (id: string, v: string) => {
-    setValues((p) => ({ ...p, [id]: v }));
-    setDirty(true);
+    const next = { ...valuesRef.current, [id]: v };
+    valuesRef.current = next;
+    setValues(next);
     if (errors[id]) setErrors(({ [id]: _, ...rest }) => rest);
+    schedule();
   };
   const blur = (f: FieldDef) => {
+    if (dirty.current) flush();
     if (!values[f.id]?.trim()) return;
     const e = validateField(f, values[f.id]);
     setErrors((p) => {
@@ -263,8 +358,24 @@ function Wizard({ club }: { club: Club }) {
     });
   };
 
+  const fillFromProfile = () => {
+    const fill = prefillFromProfile(def, profile);
+    const next = { ...valuesRef.current };
+    let n = 0;
+    for (const [k, v] of Object.entries(fill))
+      if (!next[k]?.trim()) {
+        next[k] = v;
+        n++;
+      }
+    valuesRef.current = next;
+    setValues(next);
+    setNotice(n ? `Filled ${n} empty field${n === 1 ? '' : 's'} from your applicant profile. Nothing you typed was changed.` : 'No empty fields to fill from your profile.');
+    if (n) schedule();
+  };
+
   const goTo = (next: number) => {
-    if (dirty) persist({ step: Math.min(next, REVIEW) });
+    stepRef.current = next;
+    if (dirty.current) flush({ step: Math.min(next, REVIEW) });
     setErrors({});
     setStep(next);
     focusTarget.current = 'step-heading';
@@ -274,6 +385,7 @@ function Wizard({ club }: { club: Club }) {
   const showErrors = (i: number, errs: Record<string, string>) => {
     setErrors(errs);
     setStep(i);
+    stepRef.current = i;
     focusTarget.current = fieldId(def.steps[i].fields.find((f) => errs[f.id])!.id);
   };
 
@@ -288,20 +400,22 @@ function Wizard({ club }: { club: Club }) {
       const errs = validateStep(def.steps[i], values);
       if (Object.keys(errs).length) return showErrors(i, errs);
     }
-    saveApplication(
-      club.id,
-      { status: preparedStatus(getApplication(club.id)?.status), form: snapshot({ step: REVIEW, preparedAt: new Date().toISOString() }) },
-      'Demo application prepared — not submitted to the organization.',
+    const ok = flush(
+      { step: REVIEW, preparedAt: new Date().toISOString() },
+      demo ? 'Demo application prepared — not submitted to the organization.' : 'Answers prepared — not submitted to the organization.',
     );
-    setDirty(false);
+    if (!ok) return;
+    stepRef.current = DONE;
     setStep(DONE);
     focusTarget.current = 'step-heading';
     window.scrollTo({ top: 0 });
   };
 
-  const onResume = (meta: { name: string; size: number } | undefined) => {
+  const onResume = (meta: ResumeMeta | undefined) => {
+    resumeRef.current = meta;
     setResume(meta);
-    persist({ resume: meta });
+    dirty.current = true;
+    flush();
   };
 
   const labels = [...def.steps.map((s) => s.title), 'Review & finish'];
@@ -309,10 +423,19 @@ function Wizard({ club }: { club: Club }) {
   const fileName = `${club.id}-application-answers.txt`;
   const errorCount = Object.keys(errors).length;
   const cp = demo ? undefined : campusPulseLinks(club);
+  const finishLabel = demo ? 'Finish Demo Application' : 'Finish — mark answers prepared';
+  const doneHeading = demo ? 'Demo application prepared — not submitted to the organization.' : 'Answers prepared — not submitted to the organization.';
 
+  const saveText: Record<SaveState, string> = {
+    idle: 'Not saved yet',
+    pending: 'Saving…',
+    saved: savedAt ? `Saved in this browser at ${new Date(savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Saved in this browser',
+    error: "Not saved — this browser's storage is full or blocked",
+    conflict: 'Not saved — this application changed in another tab',
+  };
   const saveBar = (
-    <p className="text-xs text-ink-soft" aria-live="polite">
-      {dirty ? 'Unsaved changes' : app?.form ? `Draft saved ${fmtStamp(app.updatedAt)} in this browser` : 'Not saved yet'}
+    <p className={cx('text-xs', save === 'error' || save === 'conflict' ? 'font-bold text-badge' : 'text-ink-soft')} aria-live="polite" data-testid="save-state">
+      {saveText[save]}
     </p>
   );
 
@@ -333,6 +456,39 @@ function Wizard({ club }: { club: Club }) {
         </div>
       </header>
       <Notice club={club} />
+
+      {save === 'conflict' && (
+        <div role="alert" className="mb-5 rounded border border-badge/40 bg-[#fdeeee] p-4 text-sm text-ink" data-testid="conflict">
+          <p className="flex items-center gap-2 font-bold text-badge">
+            <TriangleAlert size={18} aria-hidden /> This application was changed in another tab.
+          </p>
+          <p className="mt-1">Your latest edits here are not saved yet, so nothing was overwritten. Choose which version to keep.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={takeTheirs} className="btn btn-secondary btn-sm">
+              Load the other tab's version
+            </button>
+            <button type="button" onClick={keepMine} className="btn btn-primary btn-sm">
+              Keep this tab's version
+            </button>
+          </div>
+        </div>
+      )}
+      {otherTabs > 0 && save !== 'conflict' && (
+        <p role="status" className="mb-4 rounded bg-surface p-3 text-sm text-ink" data-testid="other-tab">
+          This application is also open in another tab. Saved answers sync between tabs; if both tabs change it at once, you'll choose which
+          version to keep.
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="mb-4 rounded bg-[#eef6fb] p-3 text-sm text-ink" data-testid="form-notice">
+          {notice}
+        </p>
+      )}
+      {closed && (
+        <p className="mb-4 rounded bg-surface p-3 text-sm text-ink">
+          Applications are closed (verified). You can keep your answers here for a future application cycle.
+        </p>
+      )}
 
       <Stepper labels={labels} current={step} />
 
@@ -356,6 +512,20 @@ function Wizard({ club }: { club: Club }) {
           {def.steps[step].id === 'personal' && (
             <p className="mb-1 text-sm text-ink-soft">Only what an organization would reasonably ask. Nothing sensitive, and nothing leaves this browser.</p>
           )}
+          {def.steps[step].id === 'personal' && initial.prefilled && (
+            <p className="mt-2 text-sm text-ink" data-testid="prefilled">
+              Filled in from{' '}
+              <Link to="/clubs/applications/profile" className="text-link hover:underline">
+                your applicant profile
+              </Link>
+              . Changes here apply only to this application.
+            </p>
+          )}
+          {profile && !initial.prefilled && (
+            <button type="button" onClick={fillFromProfile} className="btn btn-ghost btn-sm mt-2">
+              Fill empty fields from my profile
+            </button>
+          )}
           {errorCount > 0 && (
             <p role="alert" className="mt-3 rounded border border-badge/40 bg-[#fdeeee] p-3 text-sm font-bold text-badge">
               {errorCount === 1 ? '1 answer needs attention.' : `${errorCount} answers need attention.`}
@@ -364,7 +534,16 @@ function Wizard({ club }: { club: Club }) {
           <div className="mt-4 space-y-5">
             {def.steps[step].fields.map((f) =>
               f.kind === 'file' ? (
-                <ResumeUpload key={f.id} clubId={club.id} label={f.label} help={f.help} value={resume} onChange={onResume} sample={demo} />
+                <ResumeUpload
+                  key={f.id}
+                  storageKey={club.id}
+                  label={f.label}
+                  help={f.help}
+                  value={resume}
+                  onChange={onResume}
+                  sample={demo}
+                  defaultResume={profile?.resume}
+                />
               ) : (
                 <Field key={f.id} f={f} value={values[f.id] ?? ''} error={errors[f.id]} onChange={(v) => setValue(f.id, v)} onBlur={() => blur(f)} />
               ),
@@ -376,7 +555,7 @@ function Wizard({ club }: { club: Club }) {
                 Previous
               </button>
             )}
-            <button type="button" onClick={() => persist({}, 'Draft saved in this browser. Nothing was sent.')} className="btn btn-secondary">
+            <button type="button" onClick={() => flush(undefined, 'Draft saved in this browser. Nothing was sent.')} className="btn btn-secondary">
               Save draft
             </button>
             <button type="submit" className="btn btn-primary ml-auto">
@@ -395,23 +574,33 @@ function Wizard({ club }: { club: Club }) {
           <h2 id="step-heading" tabIndex={-1} className="mb-4 text-xl font-bold text-ink outline-none">
             Review your answers
           </h2>
-          <ReviewList def={def} values={cleanValues(def, values)} resumeName={resume?.name} onEdit={goTo} />
+          <ReviewList def={def} values={cleanValues(def, values)} resume={resume} onEdit={goTo} />
           <p className="mt-2 rounded bg-surface p-3 text-sm text-ink">
-            Finishing marks this application <strong>Prepared (demo)</strong> in My Applications. Nothing is sent to {club.name}.
+            {demo ? (
+              <>
+                Finishing marks this demo application <strong>Prepared (demo) — not submitted</strong>. Nothing is sent anywhere.
+              </>
+            ) : (
+              <>
+                Finishing marks your answers <strong>prepared</strong> in My Applications. Nothing is sent to {club.name}: apply through the
+                organization's official process, then mark it “Submitted externally” yourself.
+              </>
+            )}
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line-soft pt-4">
             <button type="button" onClick={() => goTo(REVIEW - 1)} className="btn btn-secondary">
               Previous
             </button>
-            <button type="button" onClick={() => persist({}, 'Draft saved in this browser. Nothing was sent.')} className="btn btn-secondary">
+            <button type="button" onClick={() => flush(undefined, 'Draft saved in this browser. Nothing was sent.')} className="btn btn-secondary">
               Save draft
             </button>
             <button type="button" onClick={finish} className="btn btn-primary ml-auto">
-              Finish Demo Application
+              {finishLabel}
             </button>
             <div className="flex w-full flex-wrap gap-2">
               <AnswerActions text={text} fileName={fileName} />
             </div>
+            <div className="w-full">{saveBar}</div>
           </div>
         </section>
       )}
@@ -419,7 +608,7 @@ function Wizard({ club }: { club: Club }) {
       {step === DONE && app && (
         <section className="card p-5" aria-labelledby="step-heading">
           <h2 id="step-heading" tabIndex={-1} className="flex items-start gap-2 text-lg font-bold text-success outline-none">
-            <BadgeCheck size={24} aria-hidden className="shrink-0" /> Demo application prepared — not submitted to the organization.
+            <BadgeCheck size={24} aria-hidden className="shrink-0" /> {doneHeading}
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
             <StatusPill app={app} />
@@ -434,9 +623,10 @@ function Wizard({ club }: { club: Club }) {
               </p>
             ) : (
               <p>
-                <strong>Next step:</strong> apply through {club.name}'s official process (
-                <q className="italic">{club.application?.evidence}</q>).{' '}
-                {club.application?.applyUrl ? (
+                <strong>Next step:</strong> apply through {club.name}'s official process (<q className="italic">{club.application?.evidence}</q>).{' '}
+                {closed ? (
+                  'Applications are closed right now (verified).'
+                ) : club.application?.applyUrl ? (
                   <a href={club.application.applyUrl} target="_blank" rel="noopener noreferrer" className="text-link hover:underline">
                     Open the official application
                   </a>
@@ -448,7 +638,7 @@ function Wizard({ club }: { club: Club }) {
                     </a>
                   </>
                 )}
-                . Then mark it “Submitted externally” in My Applications.
+                . “Submitted externally” is a status you set yourself in My Applications once you have applied.
               </p>
             )}
           </div>

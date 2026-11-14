@@ -1,7 +1,7 @@
 // Configurable application questionnaires. Each organization gets a template chosen from its category (or set
 // explicitly on its verified application info). All of these are SAMPLE questions for preparing an application;
 // only `application.questions` (quoted from an official application) are presented as the organization's own.
-import type { ApplicationForm, Category, Club } from '../types';
+import type { ApplicantProfile, ApplicationForm, Category, Club } from '../types';
 
 export type FieldKind = 'text' | 'email' | 'url' | 'select' | 'textarea' | 'file';
 
@@ -26,7 +26,7 @@ export interface FormStep {
   fields: FieldDef[];
 }
 
-export type TemplateId = 'tech' | 'business' | 'creative' | 'media' | 'service' | 'sports' | 'general';
+export type TemplateId = 'tech' | 'business' | 'creative' | 'audition' | 'media' | 'service' | 'sports' | 'general';
 
 export interface ApplicationFormDef {
   template: TemplateId;
@@ -116,6 +116,20 @@ const TEMPLATES: Record<TemplateId, { label: string; professional: FieldDef[]; q
       question('creativeProject', 'Describe a creative project you are proud of.', 1000),
       question('mediums', 'What tools, techniques, or mediums do you use?', 600),
       question('collaborate', 'Why would you like to collaborate with this organization?', 600),
+    ],
+  },
+  audition: {
+    label: 'Audition-based performance',
+    professional: [
+      portfolio('Performance reel or portfolio link', 'A video, recording or page with your work. Optional.'),
+      resume('Optional.'),
+    ],
+    questions: [
+      { ...question('performanceExperience', 'Relevant performance experience', 800, false), help: 'Theater, improv, comedy, music: anything counts. "None yet" is fine.' },
+      question('auditionInterest', 'What draws you to audition for this group?', 600),
+      choice('performRole', 'Preferred performance role', ['Performer', 'Writer', 'Performer and writer', 'Technical or production', 'Not sure yet']),
+      short('auditionAvailability', 'When are you generally available for auditions?', true, 'Your general availability. Official audition times come from the organization.'),
+      question('prepNotes', 'Additional preparation notes', 600, false),
     ],
   },
   media: {
@@ -273,6 +287,45 @@ export function restoreForm(def: ApplicationFormDef, saved: ApplicationForm | un
   return { values, step, resume, preparedAt };
 }
 
+/** Profile fields used to prefill forms; the same definitions validate the profile itself (all optional there). */
+export const PROFILE_FIELDS: FieldDef[] = [
+  ...PERSONAL.map((f) => ({ ...f, required: false })),
+  { ...GITHUB, help: undefined },
+  LINKEDIN,
+  portfolio('Personal portfolio or website URL'),
+  { ...question('experience', 'Relevant general experience', 800, false), help: 'Reused where a form asks for relevant experience.' },
+];
+
+/**
+ * Values to prefill a new form from the applicant profile. Only fields this form has are filled; a profile portfolio
+ * fills the form's "portfolio" field, or its "website" field when it has no portfolio field.
+ */
+export function prefillFromProfile(def: ApplicationFormDef, profile: ApplicantProfile | null | undefined): Record<string, string> {
+  if (!profile) return {};
+  const ids = new Set(def.steps.flatMap((s) => s.fields.map((f) => f.id)));
+  const map: Record<string, string | undefined> = {
+    fullName: profile.fullName,
+    email: profile.email,
+    major: profile.major,
+    minor: profile.minor,
+    classYear: profile.classYear,
+    github: profile.github,
+    linkedin: profile.linkedin,
+    experience: profile.experience,
+    [ids.has('portfolio') ? 'portfolio' : 'website']: profile.portfolio,
+  };
+  const options = new Map(def.steps.flatMap((s) => s.fields.map((f) => [f.id, f.options] as const)));
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(map)) {
+    const val = v?.trim();
+    if (!val || !ids.has(k)) continue;
+    const opts = options.get(k);
+    if (opts && !opts.includes(val)) continue;
+    out[k] = val;
+  }
+  return out;
+}
+
 /** Plain-text copy of the answers, for pasting into an official application. */
 export function formatAnswers(club: Club, def: ApplicationFormDef, values: Record<string, string>, resumeName?: string): string {
   const lines = [
@@ -283,7 +336,12 @@ export function formatAnswers(club: Club, def: ApplicationFormDef, values: Recor
   for (const s of def.steps) {
     lines.push(s.title.toUpperCase());
     for (const f of s.fields) {
-      const v = f.kind === 'file' ? (resumeName ? `${resumeName} (attach it yourself)` : 'Not attached') : values[f.id]?.trim() || 'Not provided';
+      const v =
+        f.kind === 'file'
+          ? resumeName
+            ? `${resumeName} (attach it yourself; the file is not included here)`
+            : 'Not attached'
+          : values[f.id]?.replace(/\r\n?/g, '\n').trim() || 'Not provided';
       lines.push(f.kind === 'textarea' ? `${f.label}\n${v}\n` : `${f.label}: ${v}`);
     }
     lines.push('');

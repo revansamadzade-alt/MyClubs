@@ -3,7 +3,8 @@ import { Copy, Download, ExternalLink, FileCheck2, Users } from 'lucide-react';
 import type { Club, TrackedApplication } from '../types';
 import { useStore } from '../context/StoreContext';
 import { useToast } from '../context/ToastContext';
-import { STATUS_META, STEPS, applicationsClosed, fmtDay, isDemoOrg, statusLabel } from '../lib/applications';
+import { STATUS_META, STEPS, applicationsClosed, applyActionFor, fmtDay, isDemoOrg, statusLabel } from '../lib/applications';
+import { templateFor } from '../lib/applicationForms';
 import { cx } from '../lib/cx';
 
 export function StatusPill({ app }: { app: TrackedApplication }) {
@@ -57,7 +58,7 @@ export function AnswerActions({ text, fileName }: { text: string; fileName: stri
       ok = document.execCommand('copy');
       ta.remove();
     }
-    notify(ok ? 'Answers copied. Paste them into the official application.' : 'Copying is blocked in this browser. Use Download instead.');
+    notify(ok ? 'Answers copied. Paste them into the official application.' : "Couldn't copy: this browser blocked clipboard access. Use Download (.txt) instead.");
   }
   function download() {
     const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
@@ -124,7 +125,8 @@ export function MembershipInfo({ club }: { club: Club }) {
         <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-link hover:underline">
           official Campus Pulse listing
         </a>
-        , checked {fmtDay(a.verifiedOn)}.
+        , verified {fmtDay(a.verifiedOn)}
+        {a.lastChecked && a.lastChecked !== a.verifiedOn ? `, last checked ${fmtDay(a.lastChecked)}` : ''}.
       </p>
       {a.process === 'required' && (
         <dl className="mt-2 space-y-1 text-ink">
@@ -135,6 +137,8 @@ export function MembershipInfo({ club }: { club: Club }) {
                 <>
                   <strong className="text-badge">Applications closed</strong> (deadline was {fmtDay(a.deadline)})
                 </>
+              ) : applicationsClosed(club) ? (
+                <strong className="text-badge">Applications closed (verified)</strong>
               ) : a.deadline ? (
                 fmtDay(a.deadline)
               ) : (
@@ -142,10 +146,28 @@ export function MembershipInfo({ club }: { club: Club }) {
               )}
             </dd>
           </div>
+          {templateFor(club) === 'audition' && (
+            <div>
+              <dt className="inline font-bold">Auditions: </dt>
+              <dd className="inline">
+                {a.auditionInfo ?? 'Audition schedule not listed'}
+                {a.auditionUrl && (
+                  <>
+                    {' · '}
+                    <a href={a.auditionUrl} target="_blank" rel="noopener noreferrer" className="text-link hover:underline">
+                      Official audition sign-up<span className="sr-only"> (opens in a new tab)</span>
+                    </a>
+                  </>
+                )}
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="inline font-bold">Official application: </dt>
             <dd className="inline">
-              {a.applyUrl ? (
+              {applicationsClosed(club) ? (
+                <strong className="text-badge">Applications closed (verified)</strong>
+              ) : a.applyUrl ? (
                 <a href={a.applyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-link hover:underline">
                   Open official application <ExternalLink size={13} aria-hidden />
                   <span className="sr-only"> (opens in a new tab)</span>
@@ -171,10 +193,21 @@ export function ApplyButton({ club, size }: { club: Club; size?: 'sm' }) {
   if (club.application?.process !== 'required') return null;
   const sm = size === 'sm' && 'btn-sm';
   const tracked = !!getApplication(club.id);
-  if (!tracked && applicationsClosed(club))
+  const action = applyActionFor(club, tracked);
+  if (action === 'track-closed')
     return (
-      <button type="button" disabled className={cx('btn btn-secondary cursor-not-allowed opacity-60', sm)}>
-        Applications closed<span className="sr-only"> for {club.name}</span>
+      <button
+        type="button"
+        onClick={() => {
+          saveApplication(club.id, {}, `Saved ${club.name} to My Applications. Its applications are closed (verified), so there's no form to start.`);
+          navigate(`/clubs/applications/${club.id}`);
+        }}
+        className={cx('btn btn-secondary', sm)}
+        title="Applications are closed (verified). You can still save it to My Applications."
+      >
+        <FileCheck2 size={16} aria-hidden />
+        Save — applications closed
+        <span className="sr-only"> for {club.name} to My Applications</span>
       </button>
     );
   return (

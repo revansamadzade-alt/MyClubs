@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   EllipsisVertical,
+  FileCheck2,
   FilePen,
   HeartHandshake,
   Megaphone,
@@ -18,7 +19,8 @@ import { ACADEMIC_ITEMS, COURSES, COURSE_BY_ID } from '../data/courses';
 import { PatternCover } from '../components/PatternCover';
 import { useStore } from '../context/StoreContext';
 import { upcomingForClubs } from '../lib/schedule';
-import { fmtDue, fmtRange, relativeDay } from '../lib/dates';
+import { applicationTasks } from '../lib/applicationPlanner';
+import { fmtDue, fmtRange, fmtTime, relativeDay } from '../lib/dates';
 import { useTitle } from '../hooks/useTitle';
 
 /*
@@ -107,8 +109,9 @@ function SidebarHeading({ children }: { children: ReactNode }) {
 
 function TodoPanel() {
   const [dismissed, setDismissed] = useState<string[]>([]);
-  const { followed } = useStore();
+  const { followed, applications } = useStore();
   const now = new Date();
+  const appTasks = applicationTasks(applications, now, 4);
   const todos = ACADEMIC_ITEMS.filter((a) => a.start > now && !dismissed.includes(a.id)).slice(0, 6);
   const clubItems = upcomingForClubs(followed, 7).slice(0, 3);
 
@@ -159,6 +162,33 @@ function TodoPanel() {
       <Link to="/clubs/campus-life" className="mt-1 inline-block pl-[22px] text-sm text-link hover:underline">
         Show all in My Campus Life
       </Link>
+
+      <div className="mt-6" data-testid="todo-applications">
+        <h3 className="flex items-center gap-1.5 pl-[22px] text-sm font-bold text-ink">
+          <FileCheck2 size={16} className="text-[#5a3a8a]" aria-hidden /> MyClubs applications
+        </h3>
+        {appTasks.length ? (
+          <ul className="pt-1 text-sm leading-[1.25]">
+            {appTasks.map((t) => (
+              <li key={t.id} className="py-1 pl-[22px]">
+                <Link to={t.href} className="block truncate text-link underline underline-offset-2 hover:text-link-dark">
+                  {t.title}
+                </Link>
+                <p className="text-[#586874]">{t.detail}</p>
+                {t.when && <p className="text-black">{t.allDay ? relativeDay(t.when) : `${relativeDay(t.when)} · ${fmtTime(t.when)}`}</p>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="py-1 pl-[22px] text-sm text-ink-soft">
+            No application tasks.{' '}
+            <Link to="/clubs/applications" className="text-link hover:underline">
+              Applications
+            </Link>
+          </p>
+        )}
+        <p className="pl-[22px] text-xs text-ink-soft">From MyClubs — not Canvas assignments.</p>
+      </div>
 
       <div className="mt-8">
         <SidebarHeading>

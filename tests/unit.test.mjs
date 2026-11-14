@@ -27,6 +27,8 @@ const server = await createServer({
   appType: 'custom',
   server: { middlewareMode: true, hmr: false },
   optimizeDeps: { noDiscovery: true, include: [] },
+  // Resolve the router to its ESM build (its "node" export is CommonJS), so named imports work in component tests.
+  ssr: { resolve: { externalConditions: ['module-sync'] } },
 });
 after(() => server.close());
 
@@ -40,6 +42,8 @@ const { VERIFIED_EVENTS } = await load('/src/data/verifiedEvents.ts');
 const { CLUBS } = await load('/src/data/clubs.ts');
 const AF = await load('/src/lib/applicationForms.ts');
 const APPS = await load('/src/lib/applications.ts');
+const PL = await load('/src/lib/applicationPlanner.ts');
+const STORE = await load('/src/context/StoreContext.tsx');
 
 const from = D.startOfDay(new Date());
 const to = D.addDays(from, 14);
@@ -180,7 +184,8 @@ test('application form template follows the organization category, with explicit
   for (const c of ['Cultural', 'Academic', 'Gaming', 'Campus Life']) assert.equal(as(c), 'general');
   assert.equal(as('Cultural', { process: 'required', template: 'media' }), 'media');
   assert.equal(as('Cultural', { process: 'required', template: 'nonsense' }), 'general');
-  assert.equal(AF.templateFor(byId('comedyleague')), 'creative');
+  assert.equal(AF.templateFor(byId('comedyleague')), 'audition', 'verified audition requirement → audition template');
+  assert.equal(AF.templateFor({ ...byId('comedyleague'), application: { process: 'required' } }), 'creative', 'Arts & Music without an override → creative');
   assert.equal(AF.templateFor(byId('bestbuddies')), 'service');
   assert.equal(AF.templateFor(APPS.DEMO_ORG), 'tech');
 });
@@ -258,12 +263,12 @@ test('saved drafts restore defensively from corrupted or outdated data', () => {
 test('exported answers are labeled as not official and include every question', () => {
   const club = byId('comedyleague');
   const form = AF.buildForm(club);
-  const text = AF.formatAnswers(club, form, { fullName: 'Alex', creativeWork: 'Improv' }, 'cv.pdf');
+  const text = AF.formatAnswers(club, form, { fullName: 'Alex', auditionInterest: 'Improv' }, 'cv.pdf');
   assert.match(text, /^Comedy League: application answers/);
   assert.match(text, /not an official application and nothing was submitted/);
   assert.match(text, /Full name: Alex/);
-  assert.match(text, /What kind of creative work do you enjoy\?\nImprov/);
-  assert.match(text, /cv\.pdf \(attach it yourself\)/);
+  assert.match(text, /What draws you to audition for this group\?\nImprov/);
+  assert.match(text, /cv\.pdf \(attach it yourself; the file is not included here\)/);
   assert.match(text, /UMass email address: Not provided/);
 });
 
@@ -282,4 +287,147 @@ test('status rules: editing returns to draft but never overrides a self-reported
   assert.equal(APPS.draftStatus('submitted'), 'submitted');
   assert.equal(APPS.preparedStatus('draft'), 'prepared');
   assert.equal(APPS.preparedStatus('decision'), 'decision');
+});
+
+const REQ = { process: 'required', evidence: 'Audition required.', sourceUrl: 'https://example.org', verifiedOn: '2026-11-01' };
+const fixture = (application, id = 'fixture') => ({ ...CLUBS[0], id, name: 'Fixture Club', application });
+
+test('Apply action fixtures: open, closed by deadline, closed by status, unknown, tracked', () => {
+  assert.equal(APPS.applyActionFor(fixture({ ...REQ }), false), 'apply', 'required, no deadline listed: not closed');
+  assert.equal(APPS.applyActionFor(fixture({ ...REQ, deadline: '2026-11-20' }), false), 'apply');
+  assert.equal(APPS.applyActionFor(fixture({ ...REQ, deadline: '2026-11-10' }), false), 'track-closed');
+  assert.equal(APPS.applyActionFor(fixture({ ...REQ, availability: 'closed' }), false), 'track-closed');
+  assert.equal(APPS.applyActionFor(fixture({ ...REQ, deadline: '2026-11-10' }), true), 'view', 'already tracked stays reachable');
+  assert.equal(APPS.applyActionFor(fixture(undefined), false), null, 'unknown process: no Apply');
+  assert.equal(APPS.applyActionFor(fixture({ ...REQ, process: 'open' }), false), null);
+});
+
+test('closed application renders a working "save" button, not a disabled dead end (server-rendered fixture)', async () => {
+  const ReactNS = await import('react');
+  const React = ReactNS.default ?? ReactNS;
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { MemoryRouter } = await import('react-router-dom');
+  const { ToastProvider } = await load('/src/context/ToastContext.tsx');
+  const { ApplyButton } = await load('/src/components/Applications.tsx');
+  const render = (application) =>
+    renderToStaticMarkup(
+      React.createElement(MemoryRouter, null, React.createElement(ToastProvider, null, React.createElement(STORE.StoreProvider, null, React.createElement(ApplyButton, { club: fixture(application) })))),
+    );
+  const closed = render({ ...REQ, deadline: '2026-11-10' });
+  assert.match(closed, /Save — applications closed/);
+  assert.doesNotMatch(closed, /disabled/);
+  const open = render({ ...REQ });
+  assert.match(open, />Apply</);
+  assert.doesNotMatch(render(undefined), /<button/, 'unknown process: no Apply control');
+});
+
+test('stored applications from earlier versions migrate without losing data', () => {
+  const now = '2026-11-01T00:00:00.000Z';
+  const [a, b, c] = STORE.cleanApplications([
+    { clubId: 'umoc', status: 'decision', reminder: '2026-11-18', decisionNote: 'Got in!', createdAt: now, updatedAt: now },
+    { clubId: 'chessclub', status: 'interested', reminder: 'nope', dates: [{ id: 'x', kind: 'party', date: '2026-11-19' }, { id: 'y', kind: 'audition', date: '2026-11-19', time: '18:00' }], createdAt: now, updatedAt: now },
+    { clubId: 'bestbuddies', status: 'decision', decision: 'bogus', createdAt: now, updatedAt: now },
+    { clubId: 'bad', status: 'unknown', createdAt: now, updatedAt: now },
+  ]);
+  assert.deepEqual(a.dates, [{ id: 'legacy-reminder', kind: 'reminder', date: '2026-11-18' }]);
+  assert.equal('reminder' in a, false);
+  assert.equal(a.decision, 'other');
+  assert.equal(a.decisionNote, 'Got in!', 'free text kept as the note');
+  assert.deepEqual(b.dates.map((d) => d.id), ['y'], 'invalid kinds and dates dropped');
+  assert.equal(c.decision, 'other', 'unknown outcome replaced, not crashed');
+  assert.equal(STORE.cleanApplications([{ clubId: 'bad', status: 'unknown' }]).length, 0);
+});
+
+test('application dates on the calendar: student dates labeled, verified deadline only when present, never conflicts', () => {
+  const from = new Date(2026, 10, 15);
+  const to = new Date(2026, 10, 29);
+  const app = {
+    clubId: 'comedyleague',
+    status: 'draft',
+    createdAt: '',
+    updatedAt: '',
+    dates: [
+      { id: 'a', kind: 'audition', date: '2026-11-18', time: '18:30', note: 'Bring a piece' },
+      { id: 'r', kind: 'reminder', date: '2026-11-20' },
+      { id: 'old', kind: 'reminder', date: '2026-10-01' },
+    ],
+  };
+  const items = PL.applicationScheduleItems([app, app], from, to);
+  assert.deepEqual(items.map((i) => i.id).sort(), ['app:comedyleague:a', 'app:comedyleague:r'], 'in range, no duplicates');
+  const aud = items.find((i) => i.id.endsWith(':a'));
+  assert.equal(aud.title, 'Audition: Comedy League');
+  assert.equal(aud.userEntered, true);
+  assert.match(aud.typeLabel, /you entered/);
+  assert.equal(aud.start.getHours(), 18);
+  const rem = items.find((i) => i.id.endsWith(':r'));
+  assert.equal(rem.allDay, true);
+  assert.equal(rem.end.getTime() - rem.start.getTime(), 86400000, 'all-day items last until midnight');
+  assert.equal(items.some((i) => i.id.startsWith('appdl:')), false, 'no deadline is invented for real clubs');
+  const S_items = S.buildSchedule({ followed: [], saved: [], from, to, applications: [app] });
+  assert.ok(S_items.some((i) => i.kind === 'application'));
+  assert.equal([...S.findConflicts(S_items).keys()].some((id) => id.startsWith('app:')), false, 'application dates never conflict');
+  // A verified deadline (fixture) is shown and labeled as official.
+  const saved = CLUBS.find((c) => c.id === 'comedyleague').application;
+  CLUBS.find((c) => c.id === 'comedyleague').application = { ...saved, deadline: '2026-11-25' };
+  try {
+    const dl = PL.applicationScheduleItems([{ ...app, dates: [] }], from, to);
+    assert.equal(dl.length, 1);
+    assert.equal(dl[0].id, 'appdl:comedyleague');
+    assert.match(dl[0].typeLabel, /verified/);
+    assert.equal(dl[0].userEntered, undefined);
+  } finally {
+    CLUBS.find((c) => c.id === 'comedyleague').application = saved;
+  }
+});
+
+test('Dashboard To Do tasks: dated first, drafts and prepared answers next, limited, past dates skipped', () => {
+  const now = new Date();
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const day = (n) => ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + n));
+  const tasks = PL.applicationTasks(
+    [
+      { clubId: 'comedyleague', status: 'draft', form: { template: 'audition', values: {}, step: 0 }, createdAt: '', updatedAt: '', dates: [{ id: 'a', kind: 'audition', date: day(5), time: '18:00' }, { id: 'p', kind: 'reminder', date: day(-2) }] },
+      { clubId: 'bestbuddies', status: 'prepared', createdAt: '', updatedAt: '', dates: [{ id: 'r', kind: 'reminder', date: day(1) }] },
+      { clubId: 'demo-org', status: 'prepared', createdAt: '', updatedAt: '' },
+      { clubId: 'umoc', status: 'interested', createdAt: '', updatedAt: '', dates: [{ id: 'far', kind: 'reminder', date: day(60) }] },
+    ],
+    now,
+    10,
+  );
+  assert.deepEqual(tasks.map((t) => t.title), [
+    'Reminder: Best Buddies',
+    'Audition: Comedy League',
+    'Finish application draft: Comedy League',
+    'Apply through the official process: Best Buddies',
+    'Review demo application: Campus Builders Collective (demo)',
+  ]);
+  assert.equal(tasks[2].href, '/clubs/applications/comedyleague/apply');
+  assert.equal(PL.applicationTasks([{ clubId: 'comedyleague', status: 'draft', form: { template: 'audition', values: {}, step: 0 }, createdAt: '', updatedAt: '' }], now, 0).length, 0);
+});
+
+test('audition template, profile prefill and export details', () => {
+  const comedy = CLUBS.find((c) => c.id === 'comedyleague');
+  assert.equal(AF.templateFor(comedy), 'audition');
+  const form = AF.buildForm(comedy);
+  const ids = form.steps.flatMap((s) => s.fields.map((f) => f.id));
+  assert.ok(['portfolio', 'resume', 'performanceExperience', 'auditionInterest', 'performRole', 'auditionAvailability', 'prepNotes'].every((id) => ids.includes(id)));
+  assert.equal(form.steps.flatMap((s) => s.fields).find((f) => f.id === 'performanceExperience').required, false);
+  const profile = { fullName: 'Jordan', email: 'j@umass.edu', classYear: '1999', github: 'https://github.com/j', portfolio: 'https://j.dev', experience: 'Lots', updatedAt: '' };
+  const tech = AF.prefillFromProfile(AF.buildForm(APPS.DEMO_ORG), profile);
+  assert.deepEqual(tech, { fullName: 'Jordan', email: 'j@umass.edu', github: 'https://github.com/j', portfolio: 'https://j.dev' }, 'only fields the form has; stale class year dropped');
+  const business = AF.prefillFromProfile(AF.buildForm({ ...CLUBS[0], category: 'Business', application: { process: 'required' } }), profile);
+  assert.equal(business.website, 'https://j.dev', 'portfolio fills the website field when there is no portfolio field');
+  assert.equal(business.experience, 'Lots');
+  assert.deepEqual(AF.prefillFromProfile(form, null), {});
+  const text = AF.formatAnswers(comedy, form, { auditionInterest: 'Line one\r\nLine two\rLine three' }, 'cv.pdf');
+  assert.ok(text.includes('Line one\nLine two\nLine three') && !text.includes('\r'));
+  assert.match(text, /the file is not included here/);
+  for (const f of form.steps.flatMap((s) => s.fields)) assert.equal(text.split(f.label).length, 2, `"${f.label}" appears once`);
+});
+
+test('status wording: real organizations "Answers prepared — not submitted", demo keeps demo label, decisions self-reported', () => {
+  assert.equal(APPS.statusLabel({ clubId: 'comedyleague', status: 'prepared' }), 'Answers prepared — not submitted');
+  assert.equal(APPS.statusLabel({ clubId: 'demo-org', status: 'prepared' }), 'Prepared (demo) — not submitted');
+  assert.equal(APPS.statusLabel({ clubId: 'comedyleague', status: 'decision', decision: 'not-accepted' }), 'Decision: Not accepted (self-reported)');
+  assert.equal(APPS.statusLabel({ clubId: 'comedyleague', status: 'submitted' }), 'Submitted externally (self-reported)');
 });

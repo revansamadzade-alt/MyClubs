@@ -1,10 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
-import type { Review, TrackedApplication } from '../types';
+import type { ApplicantProfile, ApplicationDate, DecisionOutcome, Review, TrackedApplication } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useToast } from './ToastContext';
 import { CLUB_BY_ID } from '../data/clubs';
 import { EVENT_BY_ID } from '../data/events';
-import { clearResumes, deleteResume } from '../lib/fileStore';
+import { DEFAULT_RESUME_KEY, clearResumes, deleteResume } from '../lib/fileStore';
 
 /** Demo defaults so My Clubs & Associations and My Campus Life have content on first load. */
 const SEED_FOLLOWED = ['chessclub', 'roboticsclub'];
@@ -53,16 +53,56 @@ const isApplication = (a: unknown): a is TrackedApplication => {
   );
 };
 
+const DECISIONS: DecisionOutcome[] = ['pending', 'accepted', 'waitlisted', 'not-accepted', 'withdrawn', 'other'];
+const DATE_KINDS = ['reminder', 'interview', 'audition'];
+const isDate = (d: unknown): d is ApplicationDate => {
+  if (d === null || typeof d !== 'object') return false;
+  const x = d as Record<string, unknown>;
+  return typeof x.id === 'string' && DATE_KINDS.includes(x.kind as string) && typeof x.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.date);
+};
+
+/**
+ * Upgrades entries saved by earlier versions without losing anything:
+ * the single `reminder` date becomes an entry in `dates`, and a free-text decision keeps its text as the note
+ * with the structured outcome "Other". Invalid dates/outcomes are dropped instead of breaking the page.
+ */
+export function migrateApplication(a: TrackedApplication): TrackedApplication {
+  const out: TrackedApplication = { ...a };
+  const dates = Array.isArray(a.dates) ? a.dates.filter(isDate) : [];
+  if (typeof a.reminder === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.reminder) && !dates.some((d) => d.id === 'legacy-reminder'))
+    dates.unshift({ id: 'legacy-reminder', kind: 'reminder', date: a.reminder });
+  delete out.reminder;
+  if (dates.length) out.dates = dates;
+  else delete out.dates;
+  if (out.decision !== undefined && !DECISIONS.includes(out.decision)) delete out.decision;
+  if (out.status === 'decision' && !out.decision) out.decision = 'other';
+  return out;
+}
+
 // Entries are checked one by one below, so one corrupted or outdated entry never wipes the others.
 const isArray = (v: unknown): v is TrackedApplication[] => Array.isArray(v);
-const cleanApplications = (list: TrackedApplication[]) => list.filter(isApplication);
+export const cleanApplications = (list: TrackedApplication[]) => list.filter(isApplication).map(migrateApplication);
+
+const isProfile = (v: unknown): v is ApplicantProfile | null =>
+  v === null || (typeof v === 'object' && !Array.isArray(v) && typeof (v as { updatedAt?: unknown }).updatedAt === 'string');
 
 const KEYS = {
   followed: 'myclubs:followed',
   saved: 'myclubs:savedEvents',
   reviews: 'myclubs:reviews',
   applications: 'myclubs:applications',
+  profile: 'myclubs:profile',
 };
+
+/** The application as currently stored (read directly, so changes another tab made a moment ago are included). */
+export function readStoredApplication(clubId: string): TrackedApplication | undefined {
+  try {
+    const raw: unknown = JSON.parse(window.localStorage.getItem(KEYS.applications) ?? '[]');
+    return Array.isArray(raw) ? cleanApplications(raw).find((a) => a.clubId === clubId) : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export type ApplicationPatch = Partial<Omit<TrackedApplication, 'clubId' | 'createdAt' | 'updatedAt'>>;
 
@@ -78,9 +118,12 @@ interface StoreValue {
   deleteReview: (reviewId: string) => void;
   applications: TrackedApplication[];
   getApplication: (clubId: string) => TrackedApplication | undefined;
-  /** Create or update a tracker entry (self-reported; nothing is sent to any organization). */
-  saveApplication: (clubId: string, patch: ApplicationPatch, message?: string) => void;
+  /** Create or update a tracker entry (self-reported; nothing is sent to any organization). False if the browser refused the write. */
+  saveApplication: (clubId: string, patch: ApplicationPatch, message?: string) => boolean;
   removeApplication: (clubId: string) => void;
+  profile: ApplicantProfile | null;
+  saveProfile: (profile: Omit<ApplicantProfile, 'updatedAt'>, message?: string) => boolean;
+  deleteProfile: () => void;
   resetDemo: () => void;
 }
 
@@ -94,6 +137,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [reviews, setReviews] = useLocalStorage<Review[]>(KEYS.reviews, [], isReviewArray);
   const [applicationsRaw, setApplications] = useLocalStorage<TrackedApplication[]>(KEYS.applications, [], isArray);
   const applications = useMemo(() => cleanApplications(applicationsRaw), [applicationsRaw]);
+  const [profile, setProfile] = useLocalStorage<ApplicantProfile | null>(KEYS.profile, null, isProfile);
 
   const followed = useMemo(() => normalizeFollowed(followedRaw), [followedRaw]);
   const saved = useMemo(() => normalizeSaved(savedRaw), [savedRaw]);
@@ -169,16 +213,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const saveApplication = useCallback<StoreValue['saveApplication']>(
     (clubId, patch, message) => {
       const now = new Date().toISOString();
-      setApplications((raw) => {
+      const ok = setApplications((raw) => {
         const prev = cleanApplications(raw);
         const cur = prev.find((a) => a.clubId === clubId);
         const next: TrackedApplication = { status: 'interested', createdAt: now, ...cur, ...patch, clubId, updatedAt: now };
         return cur ? prev.map((a) => (a.clubId === clubId ? next : a)) : [...prev, next];
       });
-      if (message) notify(message);
+      if (!ok) notify("Couldn't save: this browser's storage is full or blocked.");
+      else if (message) notify(message);
+      return ok;
     },
     [notify, setApplications],
   );
+
+  const saveProfile = useCallback<StoreValue['saveProfile']>(
+    (p, message) => {
+      const ok = setProfile({ ...p, updatedAt: new Date().toISOString() });
+      if (!ok) notify("Couldn't save your profile: this browser's storage is full or blocked.");
+      else if (message) notify(message);
+      return ok;
+    },
+    [notify, setProfile],
+  );
+
+  const deleteProfile = useCallback(() => {
+    setProfile(null);
+    void deleteResume(DEFAULT_RESUME_KEY);
+    notify('Applicant profile and default résumé deleted from this browser.');
+  }, [notify, setProfile]);
 
   const removeApplication = useCallback(
     (clubId: string) => {
@@ -194,9 +256,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setSaved(SEED_SAVED);
     setReviews([]);
     setApplications([]);
+    setProfile(null);
     void clearResumes();
     notify('Demo data reset.');
-  }, [notify, setFollowed, setSaved, setReviews, setApplications]);
+  }, [notify, setFollowed, setSaved, setReviews, setApplications, setProfile]);
 
   const value = useMemo<StoreValue>(
     () => ({
@@ -213,9 +276,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       getApplication,
       saveApplication,
       removeApplication,
+      profile,
+      saveProfile,
+      deleteProfile,
       resetDemo,
     }),
-    [followed, saved, reviews, isFollowing, toggleFollow, isSaved, toggleSave, addReview, deleteReview, applications, getApplication, saveApplication, removeApplication, resetDemo],
+    [followed, saved, reviews, isFollowing, toggleFollow, isSaved, toggleSave, addReview, deleteReview, applications, getApplication, saveApplication, removeApplication, profile, saveProfile, deleteProfile, resetDemo],
   );
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
