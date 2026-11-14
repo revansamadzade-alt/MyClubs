@@ -3,8 +3,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  checkMembershipEvidence,
   classifyCategory,
   dedupeAgainst,
+  membershipLeads,
   mergeSource,
   parseCampusPulseRss,
   parseIcs,
@@ -149,4 +151,28 @@ test('membership/application info appears only when verified from the official l
     assert.equal(c.application.deadline, verified.get(c.id).deadline, 'no invented deadlines');
   }
   assert.deepEqual(data.clubs.filter((c) => c.application?.process === 'required').map((c) => c.id).sort(), ['bestbuddies', 'comedyleague']);
+});
+
+test('membership re-check: wording must still be on the page; formatting differences are ignored', () => {
+  const evidence = 'Free to join/play, players of all skill levels welcome (including beginners)!';
+  assert.equal(checkMembershipEvidence('<p>Chess Club. Free to join/play, players of all skill levels welcome(including beginners). Website: x</p>', evidence), 'confirmed');
+  assert.equal(checkMembershipEvidence('<p>Join after a short interview with the board.</p>', evidence), 'changed', 'changed wording is flagged, never rewritten');
+  assert.equal(checkMembershipEvidence('', evidence), 'unavailable');
+  assert.equal(checkMembershipEvidence('Download \u201C Stack Teamapp \u201D, then join.', 'download "Stack Teamapp", then join'), 'confirmed', 'curly quotes and spacing');
+});
+
+test('membership leads are sentences about joining, for a person to verify', () => {
+  const leads = membershipLeads('<p>We meet weekly. Auditions are held each fall for new members! Pizza is served.</p><p>Everyone is welcome to attend.</p>');
+  assert.deepEqual(leads, ['Auditions are held each fall for new members!', 'Everyone is welcome to attend.']);
+  assert.deepEqual(membershipLeads('We meet on Tuesdays in the Campus Center.'), []);
+});
+
+test('verified membership info records when it was last re-checked', () => {
+  const curated = JSON.parse(readFileSync(new URL('../scripts/curated-clubs.json', import.meta.url), 'utf8'));
+  for (const c of curated.filter((x) => x.application)) {
+    assert.match(c.application.verifiedOn, /^\d{4}-\d{2}-\d{2}$/);
+    if (c.application.lastChecked) assert.ok(c.application.lastChecked >= c.application.verifiedOn, `${c.id}: checked on or after verification`);
+    const snap = data.clubs.find((x) => x.id === c.id);
+    assert.deepEqual(snap.application, c.application, `${c.id}: snapshot matches the curated, verified entry`);
+  }
 });

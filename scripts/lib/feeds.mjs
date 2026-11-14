@@ -197,3 +197,37 @@ export function mergeSource({ ok, fresh, previous, now }) {
   const history = previous.filter((e) => !ids.has(e.id) && new Date(e.end) <= now);
   return [...fresh, ...history];
 }
+
+/** Lower-case text with HTML removed, typographic quotes/dashes normalized and whitespace collapsed. */
+export function normalizeText(s = '') {
+  return stripHtml(s)
+    .replace(/[‘’‛]/g, "'")
+    .replace(/[“”‟]/g, '"')
+    .replace(/[–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Re-check of a hand-verified membership statement against the organization's current public page text.
+ * 'confirmed' when the quoted evidence still appears; 'changed' when the page no longer contains it (needs a person to
+ * review; the verified information is never rewritten automatically); 'unavailable' when there is no page text.
+ */
+export function checkMembershipEvidence(pageText, evidence) {
+  // Compare wording only: spacing and punctuation differences ("welcome(including", a final "!" vs ".") don't count.
+  const words = (s) => ` ${normalizeText(s).replace(/[^a-z0-9]+/g, ' ').trim()} `;
+  const page = words(pageText);
+  if (!page.trim()) return 'unavailable';
+  return page.includes(words(evidence)) ? 'confirmed' : 'changed';
+}
+
+const MEMBERSHIP_WORDING = /\b(auditions?|try-?outs?|apply|application|interview|selective|recruit(ment|ing)?|become a member|open to (all|any|every)|everyone is welcome|all are welcome|no experience (is )?(necessary|needed|required)|join (at )?any ?time)\b/i;
+
+/** Sentences that mention how to join — leads for a person to verify, never applied automatically. */
+export function membershipLeads(pageText) {
+  return stripHtml(pageText)
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 15 && MEMBERSHIP_WORDING.test(s));
+}

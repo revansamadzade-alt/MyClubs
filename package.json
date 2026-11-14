@@ -11,7 +11,8 @@
     "test": "node --test tests/unit.test.mjs tests/feeds.test.mjs",
     "test:e2e": "node tests/e2e/qa.mjs",
     "sync:data": "node scripts/sync-data.mjs",
-    "build:fresh": "npm run sync:data && npm run build"
+    "build:fresh": "npm run sync:data && npm run build",
+    "check:membership": "node scripts/check-membership.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.511.0",
