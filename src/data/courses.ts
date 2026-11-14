@@ -1,4 +1,4 @@
-import type { AcademicItem, Course } from '../types';
+import type { AcademicItem, ClassSession, Course } from '../types';
 import { fromToday, nextDow } from '../lib/dates';
 
 /** Fictional demo courses. Section numbers are made up. */
@@ -105,6 +105,15 @@ export const ACADEMIC_ITEMS: AcademicItem[] = [
   },
   { id: 'ac-proposal', title: 'Final Project Proposal', courseId: 'env105', kind: 'assignment', start: fromToday(11, '23:59'), points: 15 },
   { id: 'ac-quiz6', title: 'Quiz 6: Random Variables', courseId: 'cs245', kind: 'quiz', start: fromToday(13, '21:00'), points: 10 },
+];
+
+/** DEMO class schedule for the fictional courses (weekly). Used by the calendar and Find My Fit. */
+export const CLASS_SCHEDULE: ClassSession[] = [
+  { id: 'cls-cs210-lec', courseId: 'cs210', label: 'Lecture', days: [2, 4], start: '11:30', end: '12:45', location: 'Integrative Learning Center, S140' },
+  { id: 'cls-cs245-lec', courseId: 'cs245', label: 'Lecture', days: [2, 4], start: '14:30', end: '15:45', location: 'Hasbrouck Lab, Room 20' },
+  { id: 'cls-cics195-sem', courseId: 'cics195', label: 'Seminar', days: [3], start: '16:00', end: '17:15', location: 'Computer Science Building, Room 142' },
+  { id: 'cls-cs235-lab', courseId: 'cs235', label: 'Lab', days: [4], start: '18:30', end: '20:00', location: 'Lederle Graduate Research Center, A112' },
+  { id: 'cls-env105-dis', courseId: 'env105', label: 'Discussion', days: [5], start: '10:10', end: '11:00', location: 'Morrill Science Center, Room 222' },
 ];
 
 export const ACADEMIC_KIND_LABEL: Record<AcademicItem['kind'], string> = {

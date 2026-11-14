@@ -1,5 +1,5 @@
 import type { CampusEvent, Club } from '../types';
-import { ACADEMIC_ITEMS, ACADEMIC_KIND_LABEL, COURSE_BY_ID } from '../data/courses';
+import { ACADEMIC_ITEMS, ACADEMIC_KIND_LABEL, CLASS_SCHEDULE, COURSE_BY_ID } from '../data/courses';
 import { CLUB_BY_ID } from '../data/clubs';
 import { EVENTS } from '../data/events';
 import { addDays, dateKey, startOfDay, withTime } from './dates';
@@ -70,6 +70,33 @@ export function academicItems(from: Date, to: Date): ScheduleItem[] {
   });
 }
 
+/** Demo weekly class sessions as academic time blocks. */
+export function classItems(from: Date, to: Date): ScheduleItem[] {
+  const out: ScheduleItem[] = [];
+  for (let d = startOfDay(from); d < to; d = addDays(d, 1)) {
+    for (const s of CLASS_SCHEDULE) {
+      if (!s.days.includes(d.getDay())) continue;
+      const course = COURSE_BY_ID[s.courseId];
+      const start = withTime(d, s.start);
+      const end = withTime(d, s.end);
+      if (!inRange(start, end, from, to)) continue;
+      out.push({
+        id: `cls:${s.id}:${dateKey(d)}`,
+        kind: 'academic',
+        title: `${course?.short ?? 'Course'} ${s.label}`,
+        subtitle: `${s.label} · demo class schedule`,
+        typeLabel: `${s.label} (demo class schedule)`,
+        context: course ? `${course.name} (${course.short})` : undefined,
+        start,
+        end,
+        location: s.location,
+        isDeadline: false,
+      });
+    }
+  }
+  return out;
+}
+
 /** Weekly recurrence: one occurrence per matching weekday inside [from, to). */
 export function meetingItems(clubIds: string[], from: Date, to: Date): ScheduleItem[] {
   const out: ScheduleItem[] = [];
@@ -133,7 +160,7 @@ export function buildSchedule(opts: { followed: string[]; saved: string[]; from:
   const events = EVENTS.filter(
     (e) => inRange(e.start, e.end, from, to) && (savedSet.has(e.id) || (!!e.clubId && followedSet.has(e.clubId))),
   ).map((e) => eventToItem(e, savedSet.has(e.id)));
-  return [...academicItems(from, to), ...meetingItems(followed, from, to), ...events].sort(byStart);
+  return [...academicItems(from, to), ...classItems(from, to), ...meetingItems(followed, from, to), ...events].sort(byStart);
 }
 
 /** Items the student is committed to that occupy time. Deadlines and unsaved club events are excluded. */

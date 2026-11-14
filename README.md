@@ -1,56 +1,78 @@
 # MyClubs — HackUMass 2026
 
-A prototype of what Canvas could look like if students could manage academic and extracurricular life in one place.
-The Canvas-style shell (Dashboard, Courses, Groups, …) is visual only; **MyClubs** is the working feature.
+**Find the clubs that actually fit your week — right where you already check your classes.**
+
+MyClubs is a prototype that adds an extracurricular layer to a Canvas-style dashboard. Students discover real UMass
+Amherst organizations, see which ones fit around their class schedule, and plan academics and campus life in one
+calendar that flags real time conflicts.
 
 > Independent hackathon prototype. Not affiliated with, endorsed by, or connected to UMass Amherst or Instructure Canvas.
-> Clubs are real UMass Amherst student organizations from public Campus Pulse listings; courses, deadlines and events are sample data.
+> Clubs and verified events come from public Campus Pulse listings; courses, the class schedule, deadlines and sample
+> events are demo data.
 
-## Run
+![Find My Fit](docs/screenshots/03-find-my-fit.png)
+
+## Features
+
+- **Find My Fit** — checks every club's verified meeting times and upcoming Campus Pulse events against your demo
+  class schedule, exams, followed clubs and saved events for the next 14 days. Clubs are grouped into *Fits*, *Partial
+  fit* (with the exact overlap, e.g. "Overlaps COMPSCI 235 Lab (6:30 – 8:00 PM) for 90 min"), *Conflicts* and
+  *Schedule unknown*. Optional interests re-rank results. No times are ever guessed.
+- **My Campus Life** — month, week and agenda views combining classes, course deadlines, club meetings and events.
+  Click any item for details; real overlaps are flagged with the exact window (assignment due times never count).
+- **Discover** — 28 real UMass organizations with search, category filters, sorting and source-linked profiles.
+- **Campus Events** — 19 verified upcoming events (official links, host club) plus clearly labeled sample events.
+- **My Clubs** — follow/unfollow (tracking only, not membership), upcoming activity, persistence in `localStorage`.
+- **Canvas-style shell** — dashboard, global navigation and To Do panel matched to the real Canvas layout.
+
+## How MyClubs differs from Campus Pulse
+
+| Campus Pulse | MyClubs |
+| --- | --- |
+| Directory and official registration/RSVP | Planning layer that links back to Campus Pulse for both |
+| Separate site students visit occasionally | Lives in the Canvas-style dashboard students open daily |
+| Lists clubs and events | Checks clubs against *your* schedule (Find My Fit) |
+| Events only | One calendar for classes, deadlines, meetings and events with conflict detection |
+
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Dashboard](docs/screenshots/01-dashboard.png) | ![Discover](docs/screenshots/02-discover.png) |
+| ![Club profile](docs/screenshots/04-club-profile.png) | ![My Campus Life](docs/screenshots/05-my-campus-life.png) |
+| ![Conflict details](docs/screenshots/06-conflict-details.png) | ![Find My Fit](docs/screenshots/03-find-my-fit.png) |
+
+## Run it
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm run build    # typecheck + production build
+npm run dev       # http://localhost:5173
+npm run build     # typecheck + production build
+npm run preview   # serve the production build (offline backup)
 ```
 
-## MyClubs features
+Use **Reset demo** in the MyClubs header to restore the demo state. Judge walkthrough: [docs/DEMO.md](docs/DEMO.md).
 
-| Page | Route | What works |
-| --- | --- | --- |
-| Discover | `/clubs/discover` | Search, category chips, follow filter, sort, follow/unfollow, club profiles |
-| Club profile | `/clubs/discover/:id` | Official description, Campus Pulse source + links, verified schedule and next meeting (when listed), star-rating reviews |
-| My Clubs | `/clubs/following` | Followed clubs, next meetings, 14-day activity feed, unfollow |
-| Campus Events | `/clubs/events` | All / Saved / From followed clubs tabs, search, category + date filters, save/unsave |
-| Event detail | `/clubs/events/:id` | Full info, save, schedule-conflict check |
-| My Campus Life | `/clubs/campus-life` | Month / week / agenda calendar of sample course work, followed clubs' verified weekly meetings, and saved events; click any item for details; real time overlaps flagged with the overlap window (due times never count as conflicts) |
+## Built with
 
-Follows, saved events and reviews persist in `localStorage` (`myclubs:*` keys). Use **Reset demo** in the MyClubs header to restore defaults.
-Sample dates are generated relative to today, so the demo always shows upcoming items.
+React 19, TypeScript, Vite, Tailwind CSS v4, React Router, Lucide icons. No backend: state lives in `localStorage`.
+Club and event data were pulled from Campus Pulse's public listings and committed as static TypeScript.
 
-## Club data
+## Data and honesty
 
-`src/data/clubs.ts` holds 28 active UMass Amherst student organizations. Names, summaries, descriptions,
-council tags and official links come from each organization's public Campus Pulse listing
-(`https://umassamherst.campuslabs.com/engage/organization/<id>`, retrieved 2026-11-13); every profile links to its source.
+- 28 active organizations and 19 public events from Campus Pulse (retrieved 2026-11-13); every profile and event links
+  to its source. Meeting times appear only when a listing states day, start and end time (Chess Club, Accounting
+  Association); other clubs are shown as *schedule unknown*.
+- No invented emails, member counts, reviews or events. Reviews are demo reviews written in your browser.
+- Following a club is not membership; saving an event is not an RSVP.
+- Courses, the weekly class schedule, deadlines and sample events are fictional demo data, generated relative to today.
 
-`src/data/verifiedEvents.ts` holds 19 real upcoming public events from Campus Pulse
-(`https://umassamherst.campuslabs.com/engage/event/<id>`), each linked to its host organization, with published
-start/end times (stored with their UTC offset, shown in local time). Saving one does not RSVP or register.
-Demo events stay in `src/data/events.ts`, are labeled "Sample event" everywhere and are never linked to a club.
-
-- Meeting schedules are included only when the listing states the day, start time and end time (Chess Club,
-  Accounting Association). Incomplete schedules are shown as text on the profile and never added to the calendar.
-- No emails, member counts or events are invented. Contact goes through the Campus Pulse page and listed links.
-- Category, initials, colors and cover art are MyClubs display choices (no official logos are used).
-- Reviews are demo reviews written in this browser; none are pre-filled or attributed to real students.
-
-## Structure
+## Project structure
 
 ```
 src/
-  data/        real clubs (Campus Pulse) + sample courses, academic items, events
-  lib/         date helpers, schedule builder + overlap detection
+  data/        clubs.ts + verifiedEvents.ts (Campus Pulse), courses.ts + events.ts (demo)
+  lib/         dates, schedule builder + overlap detection, fit.ts (Find My Fit)
   context/     StoreContext (follows, saves, reviews), ToastContext
   components/  AppShell, GlobalNav, cards, reviews, shared UI
   pages/       Dashboard, placeholders, clubs/* (MyClubs pages)

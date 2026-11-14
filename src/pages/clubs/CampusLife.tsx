@@ -328,7 +328,7 @@ export default function CampusLife() {
   const all = buildSchedule({ followed, saved, from, to });
   const items = all.filter((i) => shown[i.kind]);
   const conflicts = findConflicts(all);
-  const pairs = conflictPairs(all);
+  const pairs = conflictPairs(all).filter((p) => p.to > now);
   const forDay = (d: Date) => items.filter((i) => isSameDay(i.start, d));
   const live = selected ? (all.find((i) => i.id === selected.id) ?? selected) : null;
 
@@ -350,7 +350,7 @@ export default function CampusLife() {
     <>
       <PageHeader
         title="My Campus Life"
-        description="Sample course work, meetings of clubs you follow and campus events — in one calendar, with real time overlaps flagged."
+        description="Your demo class schedule and course work, meetings of clubs you follow and campus events — in one calendar, with real time overlaps flagged."
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -421,7 +421,7 @@ export default function CampusLife() {
           </span>
           <span>
             <span className="block text-xl font-bold leading-none text-ink">{pairs.length}</span>
-            <span className="text-xs text-ink-soft">Conflict{pairs.length === 1 ? '' : 's'}</span>
+            <span className="text-xs text-ink-soft">Upcoming conflict{pairs.length === 1 ? '' : 's'}</span>
           </span>
         </div>
       </div>

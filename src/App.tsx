@@ -10,6 +10,7 @@ import Following from './pages/clubs/Following';
 import Events from './pages/clubs/Events';
 import EventDetail from './pages/clubs/EventDetail';
 import CampusLife from './pages/clubs/CampusLife';
+import FindMyFit from './pages/clubs/FindMyFit';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route index element={<Navigate to="discover" replace />} />
           <Route path="discover" element={<Discover />} />
           <Route path="discover/:clubId" element={<ClubProfile />} />
+          <Route path="fit" element={<FindMyFit />} />
           <Route path="following" element={<Following />} />
           <Route path="events" element={<Events />} />
           <Route path="events/:eventId" element={<EventDetail />} />

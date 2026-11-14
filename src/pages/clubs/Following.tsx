@@ -44,9 +44,14 @@ export default function Following() {
           </>
         }
         actions={
-          <Link to="/clubs/discover" className="btn btn-secondary">
-            Find more clubs
-          </Link>
+          <>
+            <Link to="/clubs/fit" className="btn btn-primary">
+              Find My Fit
+            </Link>
+            <Link to="/clubs/discover" className="btn btn-secondary">
+              Find more clubs
+            </Link>
+          </>
         }
       />
 

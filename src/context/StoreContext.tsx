@@ -77,8 +77,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setFollowed(followed);
     if (removed && !migrationNoticeShown.current) {
       migrationNoticeShown.current = true;
+      const wasDefault = followedRaw.length === LEGACY_SEED.length && LEGACY_SEED.every((id) => followedRaw.includes(id));
       notify(
-        `Removed ${removed} fictional demo club${removed === 1 ? '' : 's'} from your follows. MyClubs now lists real UMass organizations; equivalent clubs were kept.`,
+        wasDefault
+          ? 'Your old demo follows were replaced with real UMass organizations.'
+          : `Removed ${removed} fictional demo club${removed === 1 ? '' : 's'} from your follows. MyClubs now lists real UMass organizations; equivalent clubs were kept.`,
       );
     }
   }, [followed, followedRaw, setFollowed, notify]);

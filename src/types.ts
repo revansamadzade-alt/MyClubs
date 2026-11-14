@@ -74,6 +74,17 @@ export interface Course {
 
 export type AcademicKind = 'assignment' | 'quiz' | 'exam' | 'session' | 'discussion';
 
+/** A weekly class meeting in the demo class schedule. `days` are 0 (Sunday) – 6 (Saturday). */
+export interface ClassSession {
+  id: string;
+  courseId: string;
+  label: string;
+  days: number[];
+  start: string;
+  end: string;
+  location: string;
+}
+
 export interface AcademicItem {
   id: string;
   title: string;
