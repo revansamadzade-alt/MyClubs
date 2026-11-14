@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, FileCheck2, Users } from 'lucide-react';
+import { Copy, Download, ExternalLink, FileCheck2, Users } from 'lucide-react';
 import type { Club, TrackedApplication } from '../types';
 import { useStore } from '../context/StoreContext';
-import { STATUS_META, STEPS, applicationsClosed, fmtDay, statusLabel } from '../lib/applications';
+import { useToast } from '../context/ToastContext';
+import { STATUS_META, STEPS, applicationsClosed, fmtDay, isDemoOrg, statusLabel } from '../lib/applications';
 import { cx } from '../lib/cx';
 
 export function StatusPill({ app }: { app: TrackedApplication }) {
@@ -17,7 +18,7 @@ export function StatusPill({ app }: { app: TrackedApplication }) {
 export function ProgressSteps({ app }: { app: TrackedApplication }) {
   const step = STATUS_META[app.status].step;
   return (
-    <ol className="mt-3 grid grid-cols-4 gap-1" aria-label={`Progress: step ${step + 1} of ${STEPS.length}, ${statusLabel(app)}`}>
+    <ol className="mt-3 grid grid-cols-5 gap-1" aria-label={`Progress: step ${step + 1} of ${STEPS.length}, ${statusLabel(app)}`}>
       {STEPS.map((s, i) => (
         <li key={s} className="min-w-0 text-[0.6875rem]">
           <span aria-hidden className={cx('block h-1.5 rounded-full', i <= step ? 'bg-success' : 'bg-line-soft')} />
@@ -28,13 +29,65 @@ export function ProgressSteps({ app }: { app: TrackedApplication }) {
   );
 }
 
+/** "(required)" / "(optional)" marker for form labels. */
+export function FieldTag({ required }: { required?: boolean }) {
+  return required ? (
+    <span className="text-xs font-bold text-badge">(required)</span>
+  ) : (
+    <span className="text-xs font-normal text-ink-soft">(optional)</span>
+  );
+}
+
+/** Copy or download prepared answers as plain text, for pasting into an official application. */
+export function AnswerActions({ text, fileName }: { text: string; fileName: string }) {
+  const notify = useToast();
+  async function copy() {
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      ok = document.execCommand('copy');
+      ta.remove();
+    }
+    notify(ok ? 'Answers copied. Paste them into the official application.' : 'Copying is blocked in this browser. Use Download instead.');
+  }
+  function download() {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  return (
+    <>
+      <button type="button" onClick={copy} className="btn btn-secondary btn-sm">
+        <Copy size={14} aria-hidden /> Copy answers
+      </button>
+      <button type="button" onClick={download} className="btn btn-secondary btn-sm">
+        <Download size={14} aria-hidden /> Download (.txt)
+      </button>
+    </>
+  );
+}
+
 /** Small "Application required" / "Open membership" tag; nothing when the process isn't listed. */
 export function MembershipTag({ club }: { club: Club }) {
   const a = club.application;
   if (!a) return null;
   return a.process === 'required' ? (
     <span className="inline-flex items-center gap-1 rounded-full bg-[#fff4e5] px-2 py-0.5 text-xs font-bold text-warn">
-      <FileCheck2 size={12} aria-hidden /> Application required
+      <FileCheck2 size={12} aria-hidden /> Application required{isDemoOrg(club) && ' (demo)'}
     </span>
   ) : (
     <span className="inline-flex items-center gap-1 rounded-full bg-[#e8f5ee] px-2 py-0.5 text-xs font-bold text-success">
@@ -46,6 +99,15 @@ export function MembershipTag({ club }: { club: Club }) {
 /** Verified membership/application information with its quoted source, or an honest "not listed". */
 export function MembershipInfo({ club }: { club: Club }) {
   const a = club.application;
+  if (isDemoOrg(club))
+    return (
+      <div className="text-sm">
+        <MembershipTag club={club} />
+        <p className="mt-2 text-ink">
+          Fictional organization for trying the full application journey. It uses sample questions, and nothing is sent anywhere.
+        </p>
+      </div>
+    );
   if (!a)
     return (
       <div className="text-sm">
@@ -100,8 +162,8 @@ export function MembershipInfo({ club }: { club: Club }) {
 }
 
 /**
- * "Apply" saves the organization to Applications (once, never a duplicate) and opens its application page, which
- * offers the official application link when one is published. Nothing is ever submitted.
+ * "Apply" saves the organization to Applications (once, never a duplicate) and opens its application form. Once
+ * tracked it becomes "View application". Nothing is ever submitted.
  */
 export function ApplyButton({ club, size }: { club: Club; size?: 'sm' }) {
   const { getApplication, saveApplication } = useStore();
@@ -120,7 +182,7 @@ export function ApplyButton({ club, size }: { club: Club; size?: 'sm' }) {
       type="button"
       onClick={() => {
         if (!tracked) saveApplication(club.id, {}, `Added ${club.name} to Applications. Nothing was submitted.`);
-        navigate(`/clubs/applications/${club.id}`);
+        navigate(tracked ? `/clubs/applications/${club.id}` : `/clubs/applications/${club.id}/apply`);
       }}
       className={cx('btn btn-outline', sm)}
     >

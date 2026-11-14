@@ -5,8 +5,8 @@ import { DataSources } from '../../components/DataSources';
 import type { Category } from '../../types';
 import { CATEGORIES, CLUBS } from '../../data/clubs';
 import { useStore } from '../../context/StoreContext';
-import { ClubCard } from '../../components/ClubCard';
-import { ChipGroup, EmptyState, PageHeader, SearchInput } from '../../components/ui';
+import { ClubCard, DemoOrgCard } from '../../components/ClubCard';
+import { ChipGroup, EmptyState, PageHeader, SampleBadge, SearchInput } from '../../components/ui';
 import { useTitle } from '../../hooks/useTitle';
 
 type Show = 'all' | 'following' | 'not';
@@ -117,7 +117,8 @@ export default function Discover() {
             <ClubCard key={c.id} club={c} />
           ))}
         </div>
-      ) : (
+      ) : null}
+      {!results.length && (
         <EmptyState
           icon={SearchX}
           title="No organizations match"
@@ -131,6 +132,20 @@ export default function Discover() {
         >
           Try a different keyword or category.
         </EmptyState>
+      )}
+
+      {process === 'required' && !q && cat === 'All' && show === 'all' && (
+        <section aria-labelledby="demo-org-heading" className="mt-8">
+          <h2 id="demo-org-heading" className="section-title flex flex-wrap items-center gap-2">
+            Try the full application journey <SampleBadge label="Demo organization" />
+          </h2>
+          <p className="mb-4 text-sm text-ink-soft">
+            This organization is fictional. Use it to try every step of an application, including a résumé. Nothing is sent anywhere.
+          </p>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            <DemoOrgCard />
+          </div>
+        </section>
       )}
     </>
   );

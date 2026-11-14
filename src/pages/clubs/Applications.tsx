@@ -4,7 +4,7 @@ import { ClipboardList, ExternalLink } from 'lucide-react';
 import type { TrackedApplication } from '../../types';
 import { CLUBS } from '../../data/clubs';
 import { useStore } from '../../context/StoreContext';
-import { DEMO_ORG, DEMO_ORG_ID, fmtDay, orgFor } from '../../lib/applications';
+import { DEMO_ORG, DEMO_ORG_ID, fmtDay, fmtStamp, isDemoOrg, orgFor } from '../../lib/applications';
 import { MembershipTag, ProgressSteps, StatusPill } from '../../components/Applications';
 import { ClubAvatar, EmptyState, PageHeader, SampleBadge } from '../../components/ui';
 import { useTitle } from '../../hooks/useTitle';
@@ -22,6 +22,8 @@ function ApplicationCard({ app }: { app: TrackedApplication }) {
   const { removeApplication } = useStore();
   const club = orgFor(app.clubId)!;
   const official = club.application?.applyUrl;
+  const required = club.application?.process === 'required';
+  const prepared = !!app.form?.preparedAt && app.status !== 'draft';
   return (
     <article className="card flex flex-col p-4" aria-labelledby={`app-${club.id}`}>
       <div className="flex items-start gap-3">
@@ -35,6 +37,7 @@ function ApplicationCard({ app }: { app: TrackedApplication }) {
           <div className="mt-1 flex flex-wrap gap-2">
             <StatusPill app={app} />
             <MembershipTag club={club} />
+            {isDemoOrg(club) && <SampleBadge label="Demo organization" />}
           </div>
         </div>
       </div>
@@ -59,6 +62,17 @@ function ApplicationCard({ app }: { app: TrackedApplication }) {
             <span className="text-ink-soft">No link saved</span>
           )}
         </Row>
+        {required && (
+          <Row label="Form">
+            {!app.form ? (
+              <span className="text-ink-soft">Not started</span>
+            ) : prepared ? (
+              `Prepared ${fmtStamp(app.form.preparedAt!)} (not submitted)`
+            ) : (
+              `Draft saved ${fmtStamp(app.updatedAt)}`
+            )}
+          </Row>
+        )}
         {app.decisionNote && <Row label="Decision">{app.decisionNote} (self-reported)</Row>}
         {app.notes && <Row label="Notes">{app.notes.length > 90 ? `${app.notes.slice(0, 90)}…` : app.notes}</Row>}
       </dl>
@@ -66,6 +80,12 @@ function ApplicationCard({ app }: { app: TrackedApplication }) {
         <Link to={`/clubs/applications/${club.id}`} className="btn btn-primary btn-sm">
           Open<span className="sr-only"> {club.name} application</span>
         </Link>
+        {required && (
+          <Link to={`/clubs/applications/${club.id}/apply${prepared ? '?view=review' : ''}`} className="btn btn-secondary btn-sm">
+            {!app.form ? 'Start application' : prepared ? 'Review answers' : 'Continue application'}
+            <span className="sr-only"> for {club.name}</span>
+          </Link>
+        )}
         <button type="button" onClick={() => removeApplication(club.id)} className="btn btn-secondary btn-sm">
           Remove<span className="sr-only"> {club.name} from tracker</span>
         </button>
@@ -78,7 +98,7 @@ export default function Applications() {
   useTitle('Applications');
   const { applications } = useStore();
   const demo = applications.find((a) => a.clubId === DEMO_ORG_ID);
-  const tracked = applications.filter((a) => a.clubId !== DEMO_ORG_ID && orgFor(a.clubId)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const tracked = applications.filter((a) => orgFor(a.clubId)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const requiredCount = CLUBS.filter((c) => c.application?.process === 'required').length;
 
   return (
@@ -93,6 +113,7 @@ export default function Applications() {
         }
       />
 
+      {!demo && (
       <section aria-labelledby="demo-app" className="mb-6 flex flex-wrap items-center gap-4 rounded border border-dashed border-[#9aa5ad] bg-surface p-4">
         <ClubAvatar club={DEMO_ORG} />
         <div className="min-w-0 flex-1 basis-60">
@@ -100,18 +121,14 @@ export default function Applications() {
             Try the demo application <SampleBadge label="Demo only" />
           </h2>
           <p className="mt-1 text-sm text-ink-soft">
-            {DEMO_ORG.name} is fictional. Demo only — not sent to the organization.
+            {DEMO_ORG.name} is fictional. Try every step: personal details, résumé, questions, review. Demo only — not sent to the organization.
           </p>
-          {demo && (
-            <div className="mt-2">
-              <StatusPill app={demo} />
-            </div>
-          )}
         </div>
-        <Link to={`/clubs/applications/${DEMO_ORG_ID}`} className="btn btn-primary">
-          {demo ? 'Continue demo application' : 'Open demo application'}
+        <Link to={`/clubs/applications/${DEMO_ORG_ID}/apply`} className="btn btn-primary">
+          Start demo application
         </Link>
       </section>
+      )}
 
       {tracked.length ? (
         <section aria-labelledby="tracked-heading">
@@ -133,13 +150,13 @@ export default function Applications() {
               <Link to="/clubs/discover?process=required" className="btn btn-primary">
                 Browse clubs that require an application
               </Link>
-              <Link to={`/clubs/applications/${DEMO_ORG_ID}`} className="btn btn-secondary">
+              <Link to={`/clubs/applications/${DEMO_ORG_ID}/apply`} className="btn btn-secondary">
                 Try the demo application
               </Link>
             </>
           }
         >
-          Open any organization's profile and choose “Track application”. Following a club never starts an application.
+          Choose Apply on an organization that requires an application, or “Track application” on any profile. Following a club never starts an application.
         </EmptyState>
       )}
     </>

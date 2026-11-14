@@ -18,7 +18,7 @@ const SECTIONS = [
 ];
 
 function crumbsFor(pathname: string): { label: string; to?: string }[] {
-  const [, , section, id] = pathname.split('/');
+  const [, , section, id, sub] = pathname.split('/');
   const sec = SECTIONS.find((s) => s.to === `/clubs/${section}`);
   const crumbs: { label: string; to?: string }[] = [{ label: 'MyClubs', to: '/clubs/discover' }];
   if (sec) crumbs.push({ label: sec.label, to: id ? sec.to : undefined });
@@ -31,7 +31,8 @@ function crumbsFor(pathname: string): { label: string; to?: string }[] {
           : section === 'applications'
             ? orgFor(id)?.name
             : undefined;
-    crumbs.push({ label: name ?? 'Not found' });
+    crumbs.push({ label: name ?? 'Not found', to: sub ? `/clubs/${section}/${id}` : undefined });
+    if (sub === 'apply') crumbs.push({ label: 'Apply' });
   }
   return crumbs;
 }
@@ -60,7 +61,7 @@ export default function ClubsLayout() {
         <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
           <ol className="flex min-w-0 items-center gap-1.5 text-[1.05rem]">
             {crumbs.map((c, i) => (
-              <li key={i} className={cx('flex min-w-0 items-center gap-1.5', i < crumbs.length - 1 && 'shrink-0')}>
+              <li key={i} className={cx('flex min-w-0 items-center gap-1.5', i < Math.min(2, crumbs.length - 1) && 'shrink-0')}>
                 {i > 0 && <ChevronRight size={14} aria-hidden className="shrink-0 text-ink-soft" />}
                 {c.to ? (
                   <Link to={c.to} className="truncate text-link hover:underline">

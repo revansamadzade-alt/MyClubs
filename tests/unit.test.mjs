@@ -38,6 +38,8 @@ const SEM = await load('/src/config/semester.ts');
 const { EVENTS } = await load('/src/data/events.ts');
 const { VERIFIED_EVENTS } = await load('/src/data/verifiedEvents.ts');
 const { CLUBS } = await load('/src/data/clubs.ts');
+const AF = await load('/src/lib/applicationForms.ts');
+const APPS = await load('/src/lib/applications.ts');
 
 const from = D.startOfDay(new Date());
 const to = D.addDays(from, 14);
@@ -160,4 +162,124 @@ test('Applications closed only after a verified official deadline has passed', a
   assert.equal(applicationsClosed(org({ process: 'open', evidence: 'x', sourceUrl: 'x', verifiedOn: '2026-11-01', deadline: '2026-11-01' })), false);
   assert.equal(applicationsClosed(org(undefined)), false);
   assert.ok(CLUBS.every((c) => !applicationsClosed(c)), 'no real organization publishes a deadline');
+});
+
+const byId = (id) => CLUBS.find((c) => c.id === id);
+const fieldIds = (form) => form.steps.flatMap((s) => s.fields.map((f) => f.id));
+
+test('application form template follows the organization category, with explicit overrides', () => {
+  const as = (category, application) => AF.templateFor({ ...CLUBS[0], category, application });
+  assert.equal(as('Technology'), 'tech');
+  assert.equal(as('Engineering'), 'tech');
+  assert.equal(as('Business'), 'business');
+  assert.equal(as('Career'), 'business');
+  assert.equal(as('Arts & Music'), 'creative');
+  assert.equal(as('Media'), 'media');
+  assert.equal(as('Service'), 'service');
+  assert.equal(as('Sports & Recreation'), 'sports');
+  for (const c of ['Cultural', 'Academic', 'Gaming', 'Campus Life']) assert.equal(as(c), 'general');
+  assert.equal(as('Cultural', { process: 'required', template: 'media' }), 'media');
+  assert.equal(as('Cultural', { process: 'required', template: 'nonsense' }), 'general');
+  assert.equal(AF.templateFor(byId('comedyleague')), 'creative');
+  assert.equal(AF.templateFor(byId('bestbuddies')), 'service');
+  assert.equal(AF.templateFor(APPS.DEMO_ORG), 'tech');
+});
+
+test('forms: technical fields for tech, portfolio (no GitHub) for creative, short forms stay short', () => {
+  const form = (category) => AF.buildForm({ ...CLUBS[0], category, application: { process: 'required' } });
+  const tech = form('Engineering');
+  assert.deepEqual(tech.steps.map((s) => s.id), ['personal', 'professional', 'questions']);
+  assert.ok(['resume', 'github', 'linkedin', 'portfolio', 'tools', 'projects'].every((id) => fieldIds(tech).includes(id)));
+  assert.equal(tech.steps[1].fields.find((f) => f.id === 'github').required, undefined, 'GitHub is encouraged, never required');
+  const creative = form('Arts & Music');
+  assert.ok(fieldIds(creative).includes('portfolio') && !fieldIds(creative).includes('github'));
+  for (const short of [form('Cultural'), form('Sports & Recreation')]) {
+    assert.deepEqual(short.steps.map((s) => s.id), ['personal', 'questions'], 'no résumé or links step');
+    assert.ok(!fieldIds(short).some((id) => ['resume', 'linkedin', 'github', 'portfolio'].includes(id)));
+  }
+  for (const f of [tech, creative, form('Business'), form('Media'), form('Service')]) {
+    const ids = fieldIds(f);
+    assert.deepEqual(ids.slice(-2), ['commitment', 'anythingElse']);
+    assert.equal(new Set(ids).size, ids.length, 'unique field ids');
+    assert.ok(f.steps.flatMap((s) => s.fields).every((x) => x.kind === 'file' || x.kind === 'select' || x.max > 0), 'every text answer has a limit');
+    assert.ok(!f.steps.flatMap((s) => s.fields).some((x) => x.kind === 'file' && x.required), 'résumé is never mandatory');
+  }
+  const official = AF.buildForm({ ...CLUBS[0], category: 'Cultural', application: { process: 'required', questions: ['Why us?'] } });
+  const q = official.steps.at(-1).fields[0];
+  assert.equal(q.label, 'Why us?');
+  assert.equal(q.official, true);
+});
+
+test('form validation: required, email, links, GitHub profile, limits', () => {
+  const tech = AF.buildForm(APPS.DEMO_ORG);
+  const f = Object.fromEntries(tech.steps.flatMap((s) => s.fields).map((x) => [x.id, x]));
+  assert.equal(AF.validateField(f.fullName, '  '), 'Enter your full name.');
+  assert.equal(AF.validateField(f.minor, ''), '', 'optional blank is fine');
+  assert.match(AF.validateField(f.email, 'not-an-email'), /valid email/);
+  assert.match(AF.validateField(f.email, 'alex@gmail.com'), /UMass email/);
+  assert.equal(AF.validateField(f.email, 'alex@umass.edu'), '');
+  assert.equal(AF.validateField(f.email, 'alex@cs.umass.edu'), '');
+  assert.equal(AF.validateField(f.github, 'https://github.com/alex-minuteman'), '');
+  assert.equal(AF.validateField(f.github, 'github.com/alex-minuteman/'), '', 'scheme optional');
+  assert.match(AF.validateField(f.github, 'https://github.com/alex/robot'), /GitHub profile link/);
+  assert.match(AF.validateField(f.github, 'https://gitlab.com/alex'), /GitHub profile link/);
+  assert.equal(AF.validateField(f.linkedin, 'linkedin.com/in/alex'), '');
+  assert.match(AF.validateField(f.linkedin, 'https://www.linkedin.com/company/umass'), /LinkedIn profile link/);
+  assert.match(AF.validateField(f.portfolio, 'not a link'), /full link/);
+  assert.equal(AF.validateField(f.portfolio, 'alex.dev/work'), '');
+  assert.match(AF.validateField(f.classYear, 'Class of 1990'), /Choose an option/);
+  assert.match(AF.validateField(f.projects, 'x'.repeat(1001)), /under 1000 characters/);
+  assert.deepEqual(Object.keys(AF.validateStep(tech.steps[0], {})), ['fullName', 'email', 'major', 'classYear']);
+  assert.equal(AF.cleanValues(tech, { github: ' github.com/alex ', minor: '  ' }).github, 'https://github.com/alex');
+  assert.equal(AF.cleanValues(tech, { minor: '  ' }).minor, undefined);
+});
+
+test('saved drafts restore defensively from corrupted or outdated data', () => {
+  const tech = AF.buildForm(APPS.DEMO_ORG);
+  const r = AF.restoreForm(tech, {
+    template: 'tech',
+    values: { fullName: 'Alex', projects: 'p'.repeat(5000), unknownOldField: 'x', email: 42, classYear: '1990', role: 'Hardware' },
+    step: 99,
+    resume: { name: 'cv.pdf', size: 'big' },
+    preparedAt: 7,
+  });
+  assert.deepEqual(Object.keys(r.values).sort(), ['fullName', 'projects', 'role']);
+  assert.equal(r.values.projects.length, 1000);
+  assert.equal(r.step, tech.steps.length, 'clamped to the review step');
+  assert.equal(r.resume, undefined);
+  assert.equal(r.preparedAt, undefined);
+  for (const junk of [undefined, null, 'garbage', { values: 'x', step: -3 }]) {
+    const x = AF.restoreForm(tech, junk);
+    assert.deepEqual(x.values, {});
+    assert.equal(x.step, 0);
+  }
+});
+
+test('exported answers are labeled as not official and include every question', () => {
+  const club = byId('comedyleague');
+  const form = AF.buildForm(club);
+  const text = AF.formatAnswers(club, form, { fullName: 'Alex', creativeWork: 'Improv' }, 'cv.pdf');
+  assert.match(text, /^Comedy League: application answers/);
+  assert.match(text, /not an official application and nothing was submitted/);
+  assert.match(text, /Full name: Alex/);
+  assert.match(text, /What kind of creative work do you enjoy\?\nImprov/);
+  assert.match(text, /cv\.pdf \(attach it yourself\)/);
+  assert.match(text, /UMass email address: Not provided/);
+});
+
+test('résumé checks: PDF type, size limit, empty and fake PDFs', async () => {
+  const pdf = (body, name = 'cv.pdf', type = 'application/pdf') => new File([body], name, { type });
+  assert.equal(await AF.checkPdf(pdf('%PDF-1.4 hello')), '');
+  assert.match(await AF.checkPdf(pdf('hello', 'cv.docx', 'application/msword')), /isn't a PDF/);
+  assert.match(await AF.checkPdf(pdf('')), /empty/);
+  assert.match(await AF.checkPdf(pdf(new Uint8Array(AF.MAX_RESUME_BYTES + 1))), /under 5 MB/);
+  assert.match(await AF.checkPdf(pdf('just text pretending')), /doesn't look like a valid PDF/);
+});
+
+test('status rules: editing returns to draft but never overrides a self-reported submission', () => {
+  assert.equal(APPS.draftStatus('interested'), 'draft');
+  assert.equal(APPS.draftStatus('prepared'), 'draft');
+  assert.equal(APPS.draftStatus('submitted'), 'submitted');
+  assert.equal(APPS.preparedStatus('draft'), 'prepared');
+  assert.equal(APPS.preparedStatus('decision'), 'decision');
 });

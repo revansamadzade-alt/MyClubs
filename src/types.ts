@@ -63,9 +63,26 @@ export interface ApplicationInfo {
   applyUrl?: string;
   /** Official deadline (YYYY-MM-DD), only when published. */
   deadline?: string;
+  /** Official open/closed status, only when the organization states it. */
+  availability?: 'open' | 'closed';
+  /** Questionnaire template; defaults to one chosen from the organization's category. */
+  template?: string;
+  /** Questions quoted from the organization's official application, only when verified. */
+  questions?: string[];
 }
 
-export type ApplicationStatus = 'interested' | 'draft' | 'submitted' | 'decision';
+export type ApplicationStatus = 'interested' | 'draft' | 'prepared' | 'submitted' | 'decision';
+
+/** In-app answers to the sample questionnaire. The résumé file itself lives in IndexedDB, keyed by clubId. */
+export interface ApplicationForm {
+  template: string;
+  values: Record<string, string>;
+  /** Step to resume on (0-based; equal to the number of steps for the review screen). */
+  step: number;
+  resume?: { name: string; size: number };
+  /** Set when the student finishes the demo application. Nothing is sent anywhere. */
+  preparedAt?: string;
+}
 
 /** A student's own application tracker entry. Everything here is self-reported; nothing is sent anywhere. */
 export interface TrackedApplication {
@@ -77,8 +94,8 @@ export interface TrackedApplication {
   reminder?: string;
   notes?: string;
   decisionNote?: string;
-  /** Demo application answers (demo organization only). */
-  demo?: { why: string; experience: string; activities: string; submittedAt?: string };
+  /** Answers to the in-app sample questionnaire. */
+  form?: ApplicationForm;
   createdAt: string;
   updatedAt: string;
 }

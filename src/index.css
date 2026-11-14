@@ -109,6 +109,9 @@ body {
     outline-offset: -1px;
     border-color: var(--color-link);
   }
+  .input[aria-invalid='true'] {
+    border-color: var(--color-badge);
+  }
 
   .chip {
     display: inline-flex;

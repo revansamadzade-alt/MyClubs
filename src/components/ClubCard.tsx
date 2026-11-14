@@ -4,8 +4,36 @@ import type { Club } from '../types';
 import { meetingLabel } from '../lib/dates';
 import { useStore } from '../context/StoreContext';
 import { PatternCover } from './PatternCover';
-import { CategoryTag, ClubAvatar, FollowButton } from './ui';
+import { CategoryTag, ClubAvatar, FollowButton, SampleBadge } from './ui';
 import { ApplyButton, MembershipTag } from './Applications';
+import { DEMO_ORG } from '../lib/applications';
+
+/** Card for the fictional demo organization. Not an <article> and not in the directory counts; no Follow. */
+export function DemoOrgCard() {
+  const club = DEMO_ORG;
+  return (
+    <div className="flex flex-col overflow-hidden rounded border border-dashed border-[#9aa5ad] bg-white" aria-labelledby="demo-org-name" data-testid="demo-org-card">
+      <div className="relative h-16">
+        <PatternCover color={club.color} variant={club.cover} className="absolute inset-0 h-full w-full" />
+      </div>
+      <div className="flex flex-1 flex-col px-4 pb-4">
+        <ClubAvatar club={club} className="-mt-6 ring-4 ring-white" />
+        <h3 id="demo-org-name" className="mt-2 font-bold leading-snug text-ink">
+          {club.name}
+        </h3>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+          <CategoryTag category={club.category} />
+          <SampleBadge label="Demo organization" />
+          <MembershipTag club={club} />
+        </div>
+        <p className="mt-2 text-sm text-ink-soft">{club.summary}</p>
+        <div className="mt-auto flex flex-wrap gap-2 pt-4">
+          <ApplyButton club={club} size="sm" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function ClubCard({ club }: { club: Club }) {
   const { isFollowing } = useStore();

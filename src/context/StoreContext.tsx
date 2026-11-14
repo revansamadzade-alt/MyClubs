@@ -4,6 +4,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useToast } from './ToastContext';
 import { CLUB_BY_ID } from '../data/clubs';
 import { EVENT_BY_ID } from '../data/events';
+import { clearResumes, deleteResume } from '../lib/fileStore';
 
 /** Demo defaults so My Clubs & Associations and My Campus Life have content on first load. */
 const SEED_FOLLOWED = ['chessclub', 'roboticsclub'];
@@ -38,19 +39,23 @@ const isReviewArray = (v: unknown): v is Review[] =>
       typeof r.createdAt === 'string',
   );
 
-const STATUSES = ['interested', 'draft', 'submitted', 'decision'];
+const STATUSES = ['interested', 'draft', 'prepared', 'submitted', 'decision'];
 
-const isApplicationArray = (v: unknown): v is TrackedApplication[] =>
-  Array.isArray(v) &&
-  v.every(
-    (a) =>
-      a !== null &&
-      typeof a === 'object' &&
-      typeof a.clubId === 'string' &&
-      STATUSES.includes(a.status) &&
-      typeof a.createdAt === 'string' &&
-      typeof a.updatedAt === 'string',
+const isApplication = (a: unknown): a is TrackedApplication => {
+  if (a === null || typeof a !== 'object') return false;
+  const x = a as Record<string, unknown>;
+  return (
+    typeof x.clubId === 'string' &&
+    STATUSES.includes(x.status as string) &&
+    typeof x.createdAt === 'string' &&
+    typeof x.updatedAt === 'string' &&
+    (x.form === undefined || (x.form !== null && typeof x.form === 'object'))
   );
+};
+
+// Entries are checked one by one below, so one corrupted or outdated entry never wipes the others.
+const isArray = (v: unknown): v is TrackedApplication[] => Array.isArray(v);
+const cleanApplications = (list: TrackedApplication[]) => list.filter(isApplication);
 
 const KEYS = {
   followed: 'myclubs:followed',
@@ -87,7 +92,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [followedRaw, setFollowed] = useLocalStorage<string[]>(KEYS.followed, SEED_FOLLOWED, isStringArray);
   const [savedRaw, setSaved] = useLocalStorage<string[]>(KEYS.saved, SEED_SAVED, isStringArray);
   const [reviews, setReviews] = useLocalStorage<Review[]>(KEYS.reviews, [], isReviewArray);
-  const [applications, setApplications] = useLocalStorage<TrackedApplication[]>(KEYS.applications, [], isApplicationArray);
+  const [applicationsRaw, setApplications] = useLocalStorage<TrackedApplication[]>(KEYS.applications, [], isArray);
+  const applications = useMemo(() => cleanApplications(applicationsRaw), [applicationsRaw]);
 
   const followed = useMemo(() => normalizeFollowed(followedRaw), [followedRaw]);
   const saved = useMemo(() => normalizeSaved(savedRaw), [savedRaw]);
@@ -163,7 +169,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const saveApplication = useCallback<StoreValue['saveApplication']>(
     (clubId, patch, message) => {
       const now = new Date().toISOString();
-      setApplications((prev) => {
+      setApplications((raw) => {
+        const prev = cleanApplications(raw);
         const cur = prev.find((a) => a.clubId === clubId);
         const next: TrackedApplication = { status: 'interested', createdAt: now, ...cur, ...patch, clubId, updatedAt: now };
         return cur ? prev.map((a) => (a.clubId === clubId ? next : a)) : [...prev, next];
@@ -175,7 +182,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const removeApplication = useCallback(
     (clubId: string) => {
-      setApplications((prev) => prev.filter((a) => a.clubId !== clubId));
+      setApplications((raw) => cleanApplications(raw).filter((a) => a.clubId !== clubId));
+      void deleteResume(clubId);
       notify('Removed from your application tracker.');
     },
     [notify, setApplications],
@@ -186,6 +194,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setSaved(SEED_SAVED);
     setReviews([]);
     setApplications([]);
+    void clearResumes();
     notify('Demo data reset.');
   }, [notify, setFollowed, setSaved, setReviews, setApplications]);
 

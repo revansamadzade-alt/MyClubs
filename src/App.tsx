@@ -13,6 +13,7 @@ import CampusLife from './pages/clubs/CampusLife';
 import FindMyFit from './pages/clubs/FindMyFit';
 import Applications from './pages/clubs/Applications';
 import ApplicationDetail from './pages/clubs/ApplicationDetail';
+import ApplyForm from './pages/clubs/ApplyForm';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="fit" element={<FindMyFit />} />
           <Route path="applications" element={<Applications />} />
           <Route path="applications/:clubId" element={<ApplicationDetail />} />
+          <Route path="applications/:clubId/apply" element={<ApplyForm />} />
           <Route path="following" element={<Following />} />
           <Route path="events" element={<Events />} />
           <Route path="events/:eventId" element={<EventDetail />} />

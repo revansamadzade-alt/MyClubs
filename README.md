@@ -26,12 +26,18 @@ calendar that flags real time conflicts.
 - **My Clubs & Associations** — follow/unfollow (tracking only, not membership), upcoming activity, persistence in `localStorage`
   that stays in sync across open tabs.
 - **Applications** — a personal tracker for organizations you want to join: status (Interested → Draft in progress →
-  Submitted externally → Decision received, all self-reported), progress steps, the link you used, your own reminder
-  date and notes. Discover can filter by membership process. **Apply** sits next to Follow on cards and profiles, only
-  where an application is verified as required; it saves the organization to Applications (never twice) and opens its
-  page with the official application link when published, otherwise *Application link not available*. *Applications
-  closed* appears only after a verified official deadline. A demo application for a fictional club shows the draft → submit flow and is labeled
-  *Demo only — not sent to the organization*.
+  Prepared (demo) → Submitted externally → Decision received; the last two are self-reported), progress steps, the link
+  you used, your own reminder date and notes. Discover can filter by membership process. **Apply** sits next to Follow
+  on cards and profiles, only where an application is verified as required (or on the clearly labeled demo
+  organization). It saves the organization to Applications (never twice) and opens its application form. *Applications
+  closed* appears only after a verified official deadline.
+- **Application forms** — a 4-step form (personal information → résumé & links → organization questions → review),
+  with draft autosave, required/optional labels, character counters, friendly validation (UMass email, GitHub/LinkedIn
+  profile links, PDF checks) and copy/download of your answers. Questions adapt to the organization's field through
+  reusable templates: technology & engineering, business, arts & creative, media, service, sports and general.
+  These are *sample application questions*; an organization's verified official requirement is shown separately.
+  Résumés (PDF, up to 5 MB) stay in this browser's IndexedDB and are never uploaded. Finishing shows *Demo application
+  prepared — not submitted to the organization.*
 - **Canvas-style shell** — dashboard, global navigation and To Do panel matched to the real Canvas layout.
 
 ## How MyClubs differs from Campus Pulse
@@ -50,6 +56,9 @@ calendar that flags real time conflicts.
 | ![Dashboard](docs/screenshots/01-dashboard.png) | ![Discover](docs/screenshots/02-discover.png) |
 | ![Club profile](docs/screenshots/04-club-profile.png) | ![My Campus Life](docs/screenshots/05-my-campus-life.png) |
 | ![Conflict details](docs/screenshots/06-conflict-details.png) | ![Find My Fit](docs/screenshots/03-find-my-fit.png) |
+| ![Apply from Discover](docs/screenshots/07-apply-discover.png) | ![Résumé and links](docs/screenshots/08-apply-resume-validation.png) |
+| ![Organization questions](docs/screenshots/09-apply-questions.png) | ![Review](docs/screenshots/10-apply-review.png) |
+| ![Prepared, not submitted](docs/screenshots/11-apply-prepared.png) | ![My Applications](docs/screenshots/12-my-applications.png) |
 
 ## Run it
 
@@ -69,7 +78,7 @@ The demo semester (Sep 2 – Dec 10, 2026) bounds weekly classes and club meetin
 
 ```bash
 npm test           # logic + feed tests: overlaps, deadlines, duplicates, semester bounds, feed parsing, snapshot integrity
-npm run test:e2e   # browser suite (229 checks); needs `npm run dev` running and Google Chrome installed
+npm run test:e2e   # browser suite (278 checks); needs `npm run dev` running and Google Chrome installed
 ```
 
 Both suites use a fixed clock (default `2026-11-13T12:00:00`, America/New_York) so results never depend on today's
@@ -113,7 +122,8 @@ Club and event data come from public feeds and are committed as a dated snapshot
 ```
 src/
   data/        clubs.ts + verifiedEvents.ts (Campus Pulse), courses.ts + events.ts (demo)
-  lib/         dates, schedule builder + overlap detection, fit.ts (Find My Fit), applications.ts (statuses, demo org)
+  lib/         dates, schedule builder + overlap detection, fit.ts (Find My Fit), applications.ts (statuses, demo org),
+               applicationForms.ts (form templates + validation), fileStore.ts (IndexedDB résumés)
   context/     StoreContext (follows, saves, reviews, applications), ToastContext
   components/  AppShell, GlobalNav, cards, reviews, shared UI
   pages/       Dashboard, placeholders, clubs/* (MyClubs pages)
