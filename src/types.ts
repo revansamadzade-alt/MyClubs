@@ -57,6 +57,8 @@ export interface CampusEvent {
   category: Category;
   clubId?: string;
   host: string;
+  /** Present only for real events from an official public listing. Absent means demo/sample data. */
+  verified?: { url: string; retrievedOn: string };
 }
 
 export interface Course {

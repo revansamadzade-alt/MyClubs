@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarCheck2, CalendarX2, Clock, MapPin, TriangleAlert, UsersRound } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, CalendarCheck2, CalendarX2, Clock, ExternalLink, Info, MapPin, TriangleAlert, UsersRound } from 'lucide-react';
 import { EVENT_BY_ID } from '../../data/events';
 import { CLUB_BY_ID } from '../../data/clubs';
 import { useStore } from '../../context/StoreContext';
@@ -44,7 +44,13 @@ export default function EventDetail() {
         <div className="min-w-0 flex-1 basis-64">
           <div className="mb-1.5 flex flex-wrap gap-2">
             <CategoryTag category={event.category} />
-            <SampleBadge />
+            {event.verified ? (
+              <span className="inline-flex items-center gap-1 text-sm text-ink-soft">
+                <BadgeCheck size={15} aria-hidden className="text-success" /> Verified on Campus Pulse
+              </span>
+            ) : (
+              <SampleBadge label="Sample event" />
+            )}
           </div>
           <h1 className="text-[1.75rem] font-bold leading-tight text-ink">{event.title}</h1>
         </div>
@@ -86,10 +92,35 @@ export default function EventDetail() {
           </dl>
           <h2 className="section-title mt-8">About this event</h2>
           <p className="leading-relaxed text-ink">{event.description}</p>
+          {event.verified ? (
+            <div className="mt-4 flex gap-2 rounded border border-[#b3d7ee] bg-[#eef6fb] p-4 text-sm text-ink">
+              <Info size={18} aria-hidden className="mt-0.5 shrink-0 text-link" />
+              <div>
+                <p>
+                  From the official Campus Pulse listing, retrieved{' '}
+                  {new Date(`${event.verified.retrievedOn}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.
+                  Saving it here only adds it to My Campus Life; it does <strong>not</strong> RSVP or register you.
+                </p>
+                <a
+                  href={event.verified.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1.5 text-link hover:underline"
+                >
+                  <ExternalLink size={14} aria-hidden /> Official event page (RSVP and updates)
+                  <span className="sr-only"> (opens in a new tab)</span>
+                </a>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-4 rounded bg-surface p-3 text-sm text-ink-soft">
+              Sample event for the demo. It is not a real UMass event.
+            </p>
+          )}
           {club && (
             <div className="mt-6 flex flex-wrap items-center gap-3 rounded border border-line p-4">
               <p className="min-w-0 flex-1 text-sm">
-                Follow <strong>{club.name}</strong> to see its weekly meetings in My Campus Life.
+                Follow <strong>{club.name}</strong> to see its verified events and any listed meetings in My Campus Life.
               </p>
               <FollowButton club={club} size="sm" />
             </div>

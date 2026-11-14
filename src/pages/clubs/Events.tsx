@@ -12,6 +12,7 @@ import { useTitle } from '../../hooks/useTitle';
 
 type View = 'all' | 'saved' | 'clubs';
 type When = 'any' | 'week' | 'two-weeks';
+type Source = 'all' | 'verified' | 'sample';
 
 export default function Events() {
   useTitle('Campus Events');
@@ -22,6 +23,7 @@ export default function Events() {
   const q = params.get('q') ?? '';
   const cat = (params.get('cat') ?? 'All') as Category | 'All';
   const when = (params.get('when') ?? 'any') as When;
+  const src = (params.get('src') ?? 'all') as Source;
 
   const update = (key: string, value: string, fallback: string) => {
     const next = new URLSearchParams(params);
@@ -42,6 +44,7 @@ export default function Events() {
   const results = inView(view).filter((e) => {
     if (cat !== 'All' && e.category !== cat) return false;
     if (limit && e.start >= limit) return false;
+    if (src !== 'all' && !!e.verified !== (src === 'verified')) return false;
     const hay = [e.title, e.description, e.host, e.location, e.category].join(' ').toLowerCase();
     return terms.every((t) => hay.includes(t));
   });
@@ -58,7 +61,7 @@ export default function Events() {
     <>
       <PageHeader
         title="Campus Events"
-        description="Find things to do on campus. Saved events are added to My Campus Life. These are sample events for the demo, not real listings, and they are not linked to any organization."
+        description="Find things to do on campus. Verified events come from public Campus Pulse listings; sample events are demo data and not real UMass events. Saving adds an event to My Campus Life — it does not RSVP or register you."
       />
 
       <div className="mb-4 flex gap-1 overflow-x-auto border-b border-line" role="group" aria-label="Event lists">
@@ -92,6 +95,14 @@ export default function Events() {
               <option value="any">Any upcoming date</option>
               <option value="week">Next 7 days</option>
               <option value="two-weeks">Next 14 days</option>
+            </select>
+          </label>
+          <label className="sm:w-52">
+            <span className="sr-only">Source</span>
+            <select value={src} onChange={(e) => update('src', e.target.value, 'all')} className="input">
+              <option value="all">Verified + sample</option>
+              <option value="verified">Verified UMass events</option>
+              <option value="sample">Sample events only</option>
             </select>
           </label>
         </div>

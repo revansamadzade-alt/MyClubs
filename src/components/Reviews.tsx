@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { Star, Trash2 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { cx } from '../lib/cx';
-import { Stars } from './ui';
+import { SampleBadge, Stars } from './ui';
 
 const MAX = 500;
 
@@ -79,8 +79,8 @@ export function Reviews({ clubId, clubName }: { clubId: string; clubName: string
         )}
       </div>
       <p className="mt-2 text-xs text-ink-soft">
-        Prototype: reviews are written by you and stored only in this browser. No reviews are pre-filled or attributed to
-        real students.
+        Demo reviews: written by you, stored only in this browser, and not from real UMass students. No ratings are
+        pre-filled or imported.
       </p>
 
       <form onSubmit={submit} className="card mt-4 space-y-4 p-4" noValidate>
@@ -125,6 +125,7 @@ export function Reviews({ clubId, clubName }: { clubId: string; clubName: string
                 <div className="flex flex-wrap items-center gap-2">
                   <Stars value={r.rating} />
                   <span className="text-sm font-bold">{r.author}</span>
+                  <SampleBadge label="Demo review" />
                   <span className="text-xs text-ink-soft">
                     {new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>

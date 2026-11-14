@@ -636,6 +636,234 @@ export const CLUBS: Club[] = [
     ],
     "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/activeminds",
     "verifiedOn": "2026-11-13"
+  },
+  {
+    "id": "skiboardclub",
+    "name": "UMass Ski and Board Club",
+    "initials": "SB",
+    "category": "Sports & Recreation",
+    "tags": [
+      "Recreation Council"
+    ],
+    "summary": "UMSBC is the largest Registered Student Organization on campus, as well as the longest one running. Since it's founding in 1969, UMSBC has offered a unique opportunity for students and community members alike to learn and improve at reduced prices.",
+    "about": "UMSBC is the largest Registered Student Organization on campus, as well as the longest one running. Since it's founding in 1969, UMSBC has offered a unique opportunity for students and community members alike to take advantage of rock bottom discount…",
+    "meetings": [],
+    "color": "#0f6b8f",
+    "cover": "topo",
+    "links": [
+      {
+        "label": "Website",
+        "url": "http://www.weliketoski.com/home.html"
+      },
+      {
+        "label": "Instagram",
+        "url": "https://www.instagram.com/umassskiandboard/?hl=en"
+      },
+      {
+        "label": "Facebook",
+        "url": "https://www.facebook.com/umsbc1969/"
+      }
+    ],
+    "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/skiboardclub",
+    "verifiedOn": "2026-11-13"
+  },
+  {
+    "id": "circlekinternationalclub",
+    "name": "Circle K International Club of the University of Massachusetts Amherst",
+    "initials": "CK",
+    "category": "Service",
+    "tags": [
+      "Service & Engagement Council"
+    ],
+    "summary": "CKI is a service club that connects students with volunteer opportunities, leadership experiences, and ways to give back on and off campus.",
+    "about": "Circle K International (CKI) is a student-led service organization that connects students with volunteer and leadership opportunities on and off campus. Members participate in projects such as neighborhood cleanups in Amherst, fundraisers for local nonprofit organizations, and district-wide initiatives like UNICEF alongside other Circle K chapters across the state. Join us to get involved in giving back to our local community!",
+    "meetings": [],
+    "color": "#1d4f91",
+    "cover": "dots",
+    "links": [
+      {
+        "label": "Instagram",
+        "url": "https://www.instagram.com/umasscki/?hl=en"
+      }
+    ],
+    "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/circlekinternationalclub",
+    "verifiedOn": "2026-11-13"
+  },
+  {
+    "id": "esportsclub",
+    "name": "UMass Gaming and Esports Club",
+    "initials": "GE",
+    "category": "Gaming",
+    "tags": [
+      "Recreation Council"
+    ],
+    "summary": "The UMass Gaming & Esports Club is a student organization based on popular PC games such as Valorant, League of Legends, Overwatch, and more. Members will participate in playing and discussing games in a casual and competitive settings.",
+    "about": "The University of Massachusetts Gaming & Esports Club is an organization where students interested in gaming can come together to engage in, strategize, spectate, and learn about games involved in the Esports scene. Our mission is to cultivate an inclusive environment where students are encouraged to grow not just their knowledge of Esports, but also their interaction with other like-minded peers.",
+    "meetings": [],
+    "color": "#5c4db1",
+    "cover": "circuit",
+    "links": [
+      {
+        "label": "Website",
+        "url": "https://discord.gg/AjSzfkRpA6"
+      }
+    ],
+    "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/esportsclub",
+    "verifiedOn": "2026-11-13"
+  },
+  {
+    "id": "formulaoneclub",
+    "name": "Formula One Club",
+    "initials": "F1",
+    "category": "Sports & Recreation",
+    "tags": [
+      "Recreation Council"
+    ],
+    "summary": "Premier Formula One Club at UMass Amherst.",
+    "about": "The mission of F1.Umass is to create a community around motorsports and Formula 1 at UMass Amherst. We aim to create an inclusive platform that facilitates meaningful interactions, informed discussions, and collective appreciation for the intricacies of sport, through information sessions, live-streamings and project activities. Follow us on our instagram page (@f1.umass) for updates on events!",
+    "meetings": [],
+    "color": "#b5261e",
+    "cover": "grid",
+    "links": [
+      {
+        "label": "Website",
+        "url": "https://spunshi24.github.io/Formula-One-Umass/"
+      },
+      {
+        "label": "Instagram",
+        "url": "https://www.instagram.com/f1.umass/"
+      }
+    ],
+    "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/formulaoneclub",
+    "verifiedOn": "2026-11-13"
+  },
+  {
+    "id": "isenbergsustainability",
+    "name": "Isenberg Sustainability Club",
+    "initials": "IS",
+    "category": "Business",
+    "tags": [
+      "Academic Council"
+    ],
+    "summary": "The purpose of the Isenberg Sustainability Club is to provide resources for students who are interested in the field of sustainability in relation to business, while fostering a collaborative environment to meet our goals.",
+    "about": "The purpose of the Isenberg Sustainability Club is to provide resources for students who are interested in the field of sustainability in relation to business, while fostering a collaborative environment to meet our goals. This organization will host career development workshops, class pick meetings, conversations surrounding sustainable reporting concepts as well as ethical business practices.",
+    "meetings": [],
+    "color": "#2e7d4f",
+    "cover": "forest",
+    "links": [
+      {
+        "label": "Instagram",
+        "url": "https://www.instagram.com/umassisbc/"
+      }
+    ],
+    "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/isenbergsustainability",
+    "verifiedOn": "2026-11-13"
+  },
+  {
+    "id": "muslimstudentsassociation",
+    "name": "Muslim Students Association",
+    "initials": "MS",
+    "category": "Cultural",
+    "tags": [
+      "Religious & Spiritual Council"
+    ],
+    "summary": "The Muslim Students Organization (MSA) exists to facilitate the practice of Islam on campus. By bringing Muslims together and providing important services, the MSA creates an Islamic atmosphere allowing students to continue their spiritual journey.",
+    "about": "The Muslim Students Organization (MSA) exists to facilitate the practice of Islam on campus. By bringing Muslims together and providing important services, the MSA creates an Islamic atmosphere allowing students to continue their spiritual journey while also sucessfully completing their studies. Hosting both social and religious events, the MSA is a community within a community.",
+    "meetings": [],
+    "color": "#127a7a",
+    "cover": "topo",
+    "links": [
+      {
+        "label": "Website",
+        "url": "http://umassmsa.com/"
+      },
+      {
+        "label": "Instagram",
+        "url": "https://www.instagram.com/umassmsa/"
+      },
+      {
+        "label": "Facebook",
+        "url": "https://www.facebook.com/umassmsa/"
+      },
+      {
+        "label": "LinkedIn",
+        "url": "https://www.linkedin.com/company/umassmsa/"
+      },
+      {
+        "label": "X (Twitter)",
+        "url": "http://twitter.com/#!/Umass_MSA"
+      }
+    ],
+    "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/muslimstudentsassociation",
+    "verifiedOn": "2026-11-13"
+  },
+  {
+    "id": "universityprogrammingcouncil",
+    "name": "University Programming Council",
+    "initials": "UP",
+    "category": "Arts & Music",
+    "tags": [
+      "Student Agency"
+    ],
+    "summary": "The University Programming Council is the student organization responsible for bringing some of the biggest events to campus. All events and programs produced by UPC are planned for students by students!",
+    "about": "The University Programming Council is the student organization responsible for bringing some of the biggest events to campus. We are a diverse group of students working to better the campus life at UMass Amherst. We plan and organize many different events in categories such as speakers, performing arts, concerts, late night programming and special events. In addition to planning the events, we also promote and market our events from the ground up.",
+    "meetings": [],
+    "color": "#7b3f99",
+    "cover": "waves",
+    "links": [
+      {
+        "label": "Website",
+        "url": "https://www.umass.edu/studentlife/get-involved/sai/upc"
+      },
+      {
+        "label": "Instagram",
+        "url": "https://www.instagram.com/umassupc/?hl=en"
+      },
+      {
+        "label": "Facebook",
+        "url": "https://www.facebook.com/UMassUPC"
+      },
+      {
+        "label": "YouTube",
+        "url": "http://www.youtube.com/umassupc"
+      },
+      {
+        "label": "X (Twitter)",
+        "url": "http://twitter.com/#!/umassupc"
+      }
+    ],
+    "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/universityprogrammingcouncil",
+    "verifiedOn": "2026-11-13"
+  },
+  {
+    "id": "comedyleague",
+    "name": "Comedy League",
+    "initials": "CL",
+    "category": "Arts & Music",
+    "tags": [
+      "Arts & Media Council"
+    ],
+    "summary": "The UMass Comedy League is the umbrella organization of UMass Amherst's premiere comedy troupes: Mission:IMPROVable, Sketch 22, and Toast! You MUST AUDITION to join! Auditions held every semester and all shows are free of charge every weekend!",
+    "about": "Comedy League is the umbrella organization of UMass Amherst's premiere comedy troupes: Mission:IMPROVable, Sketch 22, and Toast! A short-form improv troupe, Mission: IMPROVable has been bringing comedy to campus since 1991. Mission: IMPROVable combines short punchy games interspersed with blaring rock 'n' roll to create a unique, kickass comedy show.",
+    "meetings": [],
+    "color": "#995c00",
+    "cover": "dots",
+    "links": [
+      {
+        "label": "Instagram",
+        "url": "https://www.instagram.com/umasscomedy/?hl=en"
+      },
+      {
+        "label": "Facebook",
+        "url": "https://www.facebook.com/umasscomedyleague/"
+      },
+      {
+        "label": "YouTube",
+        "url": "http://www.youtube.com/user/umasssketch22"
+      }
+    ],
+    "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/comedyleague",
+    "verifiedOn": "2026-11-13"
   }
 ];
 

@@ -1,11 +1,12 @@
 import type { CampusEvent } from '../types';
 import { fromToday } from '../lib/dates';
+import { VERIFIED_EVENTS } from './verifiedEvents';
 
 type Seed = Omit<CampusEvent, 'start' | 'end'> & { day: number; from: string; to: string };
 
 /**
  * SAMPLE DATA. Fictional events generated relative to today so the demo always shows upcoming items.
- * They are not linked to any real organization; real events will be added only after verification.
+ * They are not linked to any real organization. Real events live in verifiedEvents.ts.
  */
 const SEEDS: Seed[] = [
   {
@@ -190,10 +191,13 @@ const SEEDS: Seed[] = [
   },
 ];
 
-export const EVENTS: CampusEvent[] = SEEDS.map(({ day, from, to, ...rest }) => ({
+const DEMO_EVENTS: CampusEvent[] = SEEDS.map(({ day, from, to, ...rest }) => ({
   ...rest,
   start: fromToday(day, from),
   end: fromToday(day, to),
-})).sort((a, b) => a.start.getTime() - b.start.getTime());
+}));
+
+/** Verified Campus Pulse events plus clearly separate demo events (demo events never carry `verified`). */
+export const EVENTS: CampusEvent[] = [...VERIFIED_EVENTS, ...DEMO_EVENTS].sort((a, b) => a.start.getTime() - b.start.getTime());
 
 export const EVENT_BY_ID: Record<string, CampusEvent | undefined> = Object.fromEntries(EVENTS.map((e) => [e.id, e]));
