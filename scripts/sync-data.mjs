@@ -171,6 +171,14 @@ for (const id of new Set([...prevById.keys(), ...curatedById.keys()])) {
   const club = org && org.status === 'Active' ? toClub(org, curatedById.get(id), previous) : previous?.sourceKind === 'event-host' && hostCounts.has(previous.name) ? hostClub(previous.name, previous) : previous;
   if (club) clubs.set(id, club);
 }
+// Membership/application process: only what was verified by hand from the official listing (scripts/curated-clubs.json).
+for (const c of CURATED) {
+  const club = clubs.get(c.id);
+  if (club) {
+    if (c.application) club.application = c.application;
+    else delete club.application;
+  }
+}
 const byName = (name) => [...clubs.values()].find((c) => slug(c.name) === slug(name));
 const candidates = [...hostCounts].filter(([host]) => !OFFICE.test(host) && !byName(host)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 for (const [host] of candidates) {

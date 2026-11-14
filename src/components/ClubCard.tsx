@@ -5,6 +5,7 @@ import { meetingLabel } from '../lib/dates';
 import { useStore } from '../context/StoreContext';
 import { PatternCover } from './PatternCover';
 import { CategoryTag, ClubAvatar, FollowButton } from './ui';
+import { ApplyButton, MembershipTag } from './Applications';
 
 export function ClubCard({ club }: { club: Club }) {
   const { isFollowing } = useStore();
@@ -37,6 +38,7 @@ export function ClubCard({ club }: { club: Club }) {
             <BadgeCheck size={13} aria-hidden className="text-success" />{' '}
             {club.sourceKind === 'event-host' ? 'Event host · Campus Pulse' : 'Campus Pulse'}
           </span>
+          <MembershipTag club={club} />
         </div>
         <p className="mt-2 line-clamp-2 text-sm text-ink-soft">{club.summary}</p>
         <dl className="mt-3 space-y-1 text-[0.8125rem]">
@@ -60,6 +62,7 @@ export function ClubCard({ club }: { club: Club }) {
           <Link to={href} state={linkState} className="btn btn-secondary btn-sm">
             View profile
           </Link>
+          <ApplyButton club={club} size="sm" />
         </div>
       </div>
     </article>

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
-import type { Review } from '../types';
+import type { Review, TrackedApplication } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useToast } from './ToastContext';
 import { CLUB_BY_ID } from '../data/clubs';
@@ -38,11 +38,28 @@ const isReviewArray = (v: unknown): v is Review[] =>
       typeof r.createdAt === 'string',
   );
 
+const STATUSES = ['interested', 'draft', 'submitted', 'decision'];
+
+const isApplicationArray = (v: unknown): v is TrackedApplication[] =>
+  Array.isArray(v) &&
+  v.every(
+    (a) =>
+      a !== null &&
+      typeof a === 'object' &&
+      typeof a.clubId === 'string' &&
+      STATUSES.includes(a.status) &&
+      typeof a.createdAt === 'string' &&
+      typeof a.updatedAt === 'string',
+  );
+
 const KEYS = {
   followed: 'myclubs:followed',
   saved: 'myclubs:savedEvents',
   reviews: 'myclubs:reviews',
+  applications: 'myclubs:applications',
 };
+
+export type ApplicationPatch = Partial<Omit<TrackedApplication, 'clubId' | 'createdAt' | 'updatedAt'>>;
 
 interface StoreValue {
   followed: string[];
@@ -54,6 +71,11 @@ interface StoreValue {
   toggleSave: (eventId: string) => void;
   addReview: (review: Pick<Review, 'clubId' | 'rating' | 'text' | 'author'>) => void;
   deleteReview: (reviewId: string) => void;
+  applications: TrackedApplication[];
+  getApplication: (clubId: string) => TrackedApplication | undefined;
+  /** Create or update a tracker entry (self-reported; nothing is sent to any organization). */
+  saveApplication: (clubId: string, patch: ApplicationPatch, message?: string) => void;
+  removeApplication: (clubId: string) => void;
   resetDemo: () => void;
 }
 
@@ -65,6 +87,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [followedRaw, setFollowed] = useLocalStorage<string[]>(KEYS.followed, SEED_FOLLOWED, isStringArray);
   const [savedRaw, setSaved] = useLocalStorage<string[]>(KEYS.saved, SEED_SAVED, isStringArray);
   const [reviews, setReviews] = useLocalStorage<Review[]>(KEYS.reviews, [], isReviewArray);
+  const [applications, setApplications] = useLocalStorage<TrackedApplication[]>(KEYS.applications, [], isApplicationArray);
 
   const followed = useMemo(() => normalizeFollowed(followedRaw), [followedRaw]);
   const saved = useMemo(() => normalizeSaved(savedRaw), [savedRaw]);
@@ -135,16 +158,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [notify, setReviews],
   );
 
+  const getApplication = useCallback((clubId: string) => applications.find((a) => a.clubId === clubId), [applications]);
+
+  const saveApplication = useCallback<StoreValue['saveApplication']>(
+    (clubId, patch, message) => {
+      const now = new Date().toISOString();
+      setApplications((prev) => {
+        const cur = prev.find((a) => a.clubId === clubId);
+        const next: TrackedApplication = { status: 'interested', createdAt: now, ...cur, ...patch, clubId, updatedAt: now };
+        return cur ? prev.map((a) => (a.clubId === clubId ? next : a)) : [...prev, next];
+      });
+      if (message) notify(message);
+    },
+    [notify, setApplications],
+  );
+
+  const removeApplication = useCallback(
+    (clubId: string) => {
+      setApplications((prev) => prev.filter((a) => a.clubId !== clubId));
+      notify('Removed from your application tracker.');
+    },
+    [notify, setApplications],
+  );
+
   const resetDemo = useCallback(() => {
     setFollowed(SEED_FOLLOWED);
     setSaved(SEED_SAVED);
     setReviews([]);
+    setApplications([]);
     notify('Demo data reset.');
-  }, [notify, setFollowed, setSaved, setReviews]);
+  }, [notify, setFollowed, setSaved, setReviews, setApplications]);
 
   const value = useMemo<StoreValue>(
-    () => ({ followed, saved, reviews, isFollowing, toggleFollow, isSaved, toggleSave, addReview, deleteReview, resetDemo }),
-    [followed, saved, reviews, isFollowing, toggleFollow, isSaved, toggleSave, addReview, deleteReview, resetDemo],
+    () => ({
+      followed,
+      saved,
+      reviews,
+      isFollowing,
+      toggleFollow,
+      isSaved,
+      toggleSave,
+      addReview,
+      deleteReview,
+      applications,
+      getApplication,
+      saveApplication,
+      removeApplication,
+      resetDemo,
+    }),
+    [followed, saved, reviews, isFollowing, toggleFollow, isSaved, toggleSave, addReview, deleteReview, applications, getApplication, saveApplication, removeApplication, resetDemo],
   );
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;

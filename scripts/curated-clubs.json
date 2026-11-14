@@ -141,7 +141,13 @@
   ],
   "meetings": [],
   "scheduleNote": "General meetings Mondays at 6:00 PM outside the gear locker, 472 North Pleasant Street. No end time is listed, so it is not added to your calendar.",
-  "location": "Outside the gear locker, 472 North Pleasant Street"
+  "location": "Outside the gear locker, 472 North Pleasant Street",
+  "application": {
+   "process": "open",
+   "evidence": "To participate in club trips, download \"Stack Teamapp\", make an account, and then join our group \"UMOC.\" You can then pay club dues to the trip leaders on your first trip.",
+   "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/umoc",
+   "verifiedOn": "2026-11-14"
+  }
  },
  {
   "id": "ladyzooultimate",
@@ -179,7 +185,13 @@
    }
   ],
   "scheduleNote": "Mondays and Thursdays, 6:00–9:00 PM at the Blue Wall (as stated on Campus Pulse).",
-  "location": "Blue Wall"
+  "location": "Blue Wall",
+  "application": {
+   "process": "open",
+   "evidence": "Free to join/play, players of all skill levels welcome (including beginners/people who don't know how to play!)",
+   "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/chessclub",
+   "verifiedOn": "2026-11-14"
+  }
  },
  {
   "id": "vietnamesestudentassociation",
@@ -223,7 +235,13 @@
   "tags": [
    "Service & Engagement Council"
   ],
-  "meetings": []
+  "meetings": [],
+  "application": {
+   "process": "required",
+   "evidence": "To become a member, you must submit a membership application on BB360, and we encourage you to follow our Instagram page for more frequent updates.",
+   "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/bestbuddies",
+   "verifiedOn": "2026-11-14"
+  }
  },
  {
   "id": "wmuaradiostation",
@@ -278,7 +296,13 @@
   "tags": [
    "Recreation Council"
   ],
-  "meetings": []
+  "meetings": [],
+  "application": {
+   "process": "open",
+   "evidence": "Whether you are a casual gamer, fiercly competitive, or just interested in seeing what it's like, everyone is welcome.",
+   "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/esportsclub",
+   "verifiedOn": "2026-11-14"
+  }
  },
  {
   "id": "formulaoneclub",
@@ -333,6 +357,12 @@
   "tags": [
    "Arts & Media Council"
   ],
-  "meetings": []
+  "meetings": [],
+  "application": {
+   "process": "required",
+   "evidence": "You MUST AUDITION to join! Auditions held every semester and all shows are free of charge every weekend!",
+   "sourceUrl": "https://umassamherst.campuslabs.com/engage/organization/comedyleague",
+   "verifiedOn": "2026-11-14"
+  }
  }
 ]

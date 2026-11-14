@@ -49,6 +49,38 @@ export interface Club {
   verifiedOn: string;
   /** "event-host": known only as a host in the public events feed (no profile text, contacts or schedule). */
   sourceKind?: 'profile' | 'event-host';
+  /** Membership process, only when stated in the official listing. Absent means "not listed". */
+  application?: ApplicationInfo;
+}
+
+export interface ApplicationInfo {
+  process: 'open' | 'required';
+  /** Quoted from the official listing. */
+  evidence: string;
+  sourceUrl: string;
+  verifiedOn: string;
+  /** Official application link, only when the organization publishes one. */
+  applyUrl?: string;
+  /** Official deadline (YYYY-MM-DD), only when published. */
+  deadline?: string;
+}
+
+export type ApplicationStatus = 'interested' | 'draft' | 'submitted' | 'decision';
+
+/** A student's own application tracker entry. Everything here is self-reported; nothing is sent anywhere. */
+export interface TrackedApplication {
+  clubId: string;
+  status: ApplicationStatus;
+  /** Application link the student recorded themselves. */
+  link?: string;
+  /** Personal reminder date (YYYY-MM-DD) the student entered — not an official deadline. */
+  reminder?: string;
+  notes?: string;
+  decisionNote?: string;
+  /** Demo application answers (demo organization only). */
+  demo?: { why: string; experience: string; activities: string; submittedAt?: string };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CampusEvent {

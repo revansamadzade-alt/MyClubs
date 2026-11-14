@@ -10,6 +10,7 @@ import { ChipGroup, EmptyState, PageHeader, SearchInput } from '../../components
 import { useTitle } from '../../hooks/useTitle';
 
 type Show = 'all' | 'following' | 'not';
+type Process = 'any' | 'required' | 'open' | 'unknown';
 type Sort = 'name' | 'name-desc';
 
 export default function Discover() {
@@ -21,6 +22,7 @@ export default function Discover() {
   const cat = (params.get('cat') ?? 'All') as Category | 'All';
   const show = (params.get('show') ?? 'all') as Show;
   const sort = (params.get('sort') ?? 'name') as Sort;
+  const process = (params.get('process') ?? 'any') as Process;
 
   // Filters live in the URL so they survive opening a profile and coming back.
   const update = (key: string, value: string, fallback: string) => {
@@ -37,10 +39,19 @@ export default function Discover() {
       const f = followed.includes(c.id);
       if (show === 'following' && !f) return false;
       if (show === 'not' && f) return false;
+      if (process !== 'any' && (c.application?.process ?? 'unknown') !== process) return false;
       const hay = [c.name, c.summary, c.about, c.category, c.location ?? '', c.scheduleNote ?? '', ...c.tags].join(' ').toLowerCase();
       return terms.every((t) => hay.includes(t));
     }).sort((a, b) => (sort === 'name-desc' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)));
-  }, [q, cat, show, sort, followed]);
+  }, [q, cat, show, sort, process, followed]);
+
+  const processCount = (p: Process) => CLUBS.filter((c) => (c.application?.process ?? 'unknown') === p).length;
+  const processOptions: { value: Process; label: string; count?: number }[] = [
+    { value: 'any', label: 'Any membership process' },
+    { value: 'required', label: 'Application required', count: processCount('required') },
+    { value: 'open', label: 'Open membership', count: processCount('open') },
+    { value: 'unknown', label: 'Process not listed', count: processCount('unknown') },
+  ];
 
   const categoryOptions = [
     { value: 'All' as const, label: 'All', count: CLUBS.length },
@@ -51,7 +62,7 @@ export default function Discover() {
     })),
   ];
 
-  const hasFilters = q || cat !== 'All' || show !== 'all';
+  const hasFilters = q || cat !== 'All' || show !== 'all' || process !== 'any';
 
   return (
     <>
@@ -92,6 +103,7 @@ export default function Discover() {
             </label>
           </div>
         </div>
+        <ChipGroup label="Filter by membership process" options={processOptions} value={process} onChange={(v) => update('process', v, 'any')} />
         <ChipGroup label="Filter by category" options={categoryOptions} value={cat} onChange={(v) => update('cat', v, 'All')} />
       </div>
 

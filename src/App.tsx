@@ -11,6 +11,8 @@ import Events from './pages/clubs/Events';
 import EventDetail from './pages/clubs/EventDetail';
 import CampusLife from './pages/clubs/CampusLife';
 import FindMyFit from './pages/clubs/FindMyFit';
+import Applications from './pages/clubs/Applications';
+import ApplicationDetail from './pages/clubs/ApplicationDetail';
 
 export default function App() {
   return (
@@ -22,6 +24,8 @@ export default function App() {
           <Route path="discover" element={<Discover />} />
           <Route path="discover/:clubId" element={<ClubProfile />} />
           <Route path="fit" element={<FindMyFit />} />
+          <Route path="applications" element={<Applications />} />
+          <Route path="applications/:clubId" element={<ApplicationDetail />} />
           <Route path="following" element={<Following />} />
           <Route path="events" element={<Events />} />
           <Route path="events/:eventId" element={<EventDetail />} />

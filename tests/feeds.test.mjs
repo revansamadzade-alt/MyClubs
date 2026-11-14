@@ -136,3 +136,17 @@ test('snapshot integrity: unique ids, valid links, no invented details', () => {
   }
   assert.ok(data.sources.every((s) => typeof s.ok === 'boolean' && 'updatedAt' in s));
 });
+
+test('membership/application info appears only when verified from the official listing', () => {
+  const curated = JSON.parse(readFileSync(new URL('../scripts/curated-clubs.json', import.meta.url), 'utf8'));
+  const verified = new Map(curated.filter((c) => c.application).map((c) => [c.id, c.application]));
+  for (const c of data.clubs) {
+    if (!c.application) continue;
+    assert.ok(verified.has(c.id), `${c.name}: application info must come from a hand-verified curated entry`);
+    assert.ok(['open', 'required'].includes(c.application.process));
+    assert.ok(c.application.evidence.length > 20, `${c.name}: quoted evidence`);
+    assert.ok(c.application.sourceUrl.startsWith('https://umassamherst.campuslabs.com/engage/organization/'));
+    assert.equal(c.application.deadline, verified.get(c.id).deadline, 'no invented deadlines');
+  }
+  assert.deepEqual(data.clubs.filter((c) => c.application?.process === 'required').map((c) => c.id).sort(), ['bestbuddies', 'comedyleague']);
+});

@@ -4,6 +4,7 @@ import { ChevronRight, Menu, RotateCcw } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { CLUB_BY_ID } from '../../data/clubs';
 import { EVENT_BY_ID } from '../../data/events';
+import { orgFor } from '../../lib/applications';
 import { SampleBadge } from '../../components/ui';
 import { cx } from '../../lib/cx';
 
@@ -11,6 +12,7 @@ const SECTIONS = [
   { to: '/clubs/discover', label: 'Discover' },
   { to: '/clubs/fit', label: 'Find My Fit' },
   { to: '/clubs/following', label: 'My Clubs & Associations', count: 'followed' as const },
+  { to: '/clubs/applications', label: 'Applications', count: 'applications' as const },
   { to: '/clubs/events', label: 'Campus Events', count: 'saved' as const },
   { to: '/clubs/campus-life', label: 'My Campus Life' },
 ];
@@ -21,7 +23,14 @@ function crumbsFor(pathname: string): { label: string; to?: string }[] {
   const crumbs: { label: string; to?: string }[] = [{ label: 'MyClubs', to: '/clubs/discover' }];
   if (sec) crumbs.push({ label: sec.label, to: id ? sec.to : undefined });
   if (id) {
-    const name = section === 'discover' ? CLUB_BY_ID[id]?.name : section === 'events' ? EVENT_BY_ID[id]?.title : undefined;
+    const name =
+      section === 'discover'
+        ? CLUB_BY_ID[id]?.name
+        : section === 'events'
+          ? EVENT_BY_ID[id]?.title
+          : section === 'applications'
+            ? orgFor(id)?.name
+            : undefined;
     crumbs.push({ label: name ?? 'Not found' });
   }
   return crumbs;
@@ -30,10 +39,10 @@ function crumbsFor(pathname: string): { label: string; to?: string }[] {
 /** Canvas "course" layout: breadcrumb header + collapsible section navigation. */
 export default function ClubsLayout() {
   const { pathname } = useLocation();
-  const { followed, saved, resetDemo } = useStore();
+  const { followed, saved, applications, resetDemo } = useStore();
   const [navOpen, setNavOpen] = useState(true);
   const crumbs = crumbsFor(pathname);
-  const counts = { followed: followed.length, saved: saved.length };
+  const counts = { followed: followed.length, saved: saved.length, applications: applications.length };
 
   return (
     <div>
@@ -74,7 +83,7 @@ export default function ClubsLayout() {
           onClick={() => {
             if (
               window.confirm(
-                'Reset to the demo scenario? You will follow Chess Club and UMass Robotics Club, have two sample events saved, and your reviews will be cleared.',
+                'Reset to the demo scenario? You will follow Chess Club and UMass Robotics Club, have two sample events saved, and your reviews and tracked applications will be cleared.',
               )
             )
               resetDemo();

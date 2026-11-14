@@ -1,4 +1,6 @@
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useStore } from '../../context/StoreContext';
+import { ApplyButton, MembershipInfo } from '../../components/Applications';
 import { ArrowLeft, BadgeCheck, CalendarClock, Clock, ExternalLink, Info, MapPin, SearchX } from 'lucide-react';
 import { CLUB_BY_ID, campusPulseLinks } from '../../data/clubs';
 import { EVENTS } from '../../data/events';
@@ -14,6 +16,8 @@ export default function ClubProfile() {
   const { clubId = '' } = useParams();
   const club = CLUB_BY_ID[clubId];
   const { state } = useLocation();
+  const navigate = useNavigate();
+  const { getApplication, saveApplication } = useStore();
   const backTo = `/clubs/discover${(state as { discoverSearch?: string } | null)?.discoverSearch ?? ''}`;
   useTitle(club?.name ?? 'Club not found');
 
@@ -123,6 +127,31 @@ export default function ClubProfile() {
         </div>
 
         <aside className="space-y-4">
+          <div className="card p-4" aria-labelledby="membership-heading">
+            <h2 id="membership-heading" className="mb-2 font-bold">
+              Membership &amp; applications
+            </h2>
+            <MembershipInfo club={club} />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <ApplyButton club={club} size="sm" />
+              {getApplication(club.id) ? (
+                <Link to={`/clubs/applications/${club.id}`} className="btn btn-secondary btn-sm">
+                  View application tracker
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveApplication(club.id, {}, `Added ${club.name} to your applications. Following is unchanged.`);
+                    navigate(`/clubs/applications/${club.id}`);
+                  }}
+                  className="btn btn-secondary btn-sm"
+                >
+                  Track application
+                </button>
+              )}
+            </div>
+          </div>
           <div className="card p-4">
             <h2 className="mb-3 flex items-center gap-2 font-bold">
               <CalendarClock size={18} aria-hidden className="text-umass" /> Meetings

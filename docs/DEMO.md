@@ -36,6 +36,10 @@
   (Dec 10, 2026); change `VITE_SEMESTER_START` / `VITE_SEMESTER_END` if judging falls outside it.
 - **Laptop failure:** walk through `docs/screenshots/` (dashboard → discover → find my fit → profile → calendar →
   conflict details) in that order using the same script.
+- **Optional Applications segment (+30 s):** Discover → **Application required** chip → open Comedy League (the
+  audition requirement is quoted from its Campus Pulse page) → **Apply** → **Track application**. Then open the demo
+  application from the Applications page: it is a fictional club and is labeled *Demo only — not sent to the
+  organization*. Statuses are self-reported; nothing is submitted to a real club.
 - **Questions about data:** clubs/events come from public Campus Pulse listings (links on every page); courses,
   class schedule and sample events are labeled demo data; no Canvas or UMass integration is claimed.
 

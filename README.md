@@ -25,6 +25,11 @@ calendar that flags real time conflicts.
   links, host club when known, deduplicated across sources), paged for speed, plus clearly labeled sample events.
 - **My Clubs & Associations** — follow/unfollow (tracking only, not membership), upcoming activity, persistence in `localStorage`
   that stays in sync across open tabs.
+- **Applications** — a personal tracker for organizations you want to join: status (Interested → Draft in progress →
+  Submitted externally → Decision received, all self-reported), progress steps, the link you used, your own reminder
+  date and notes. Discover can filter by membership process, and **Apply** appears only where an application is
+  verified as required. A demo application for a fictional club shows the draft → submit flow and is labeled
+  *Demo only — not sent to the organization*.
 - **Canvas-style shell** — dashboard, global navigation and To Do panel matched to the real Canvas layout.
 
 ## How MyClubs differs from Campus Pulse
@@ -62,7 +67,7 @@ The demo semester (Sep 2 – Dec 10, 2026) bounds weekly classes and club meetin
 
 ```bash
 npm test           # logic + feed tests: overlaps, deadlines, duplicates, semester bounds, feed parsing, snapshot integrity
-npm run test:e2e   # browser suite (194 checks); needs `npm run dev` running and Google Chrome installed
+npm run test:e2e   # browser suite (221 checks); needs `npm run dev` running and Google Chrome installed
 ```
 
 Both suites use a fixed clock (default `2026-11-13T12:00:00`, America/New_York) so results never depend on today's
@@ -94,7 +99,11 @@ Club and event data come from public feeds and are committed as a dated snapshot
 - Meeting times appear only when a listing states day, start and end time (Chess Club, Accounting Association);
   other clubs are shown as *schedule unknown* in Find My Fit, with the reason.
 - No invented emails, member counts, reviews or events. Reviews are demo reviews written in your browser.
-- Following a club is not membership; saving an event is not an RSVP.
+- Following a club is not membership; saving an event is not an RSVP; tracking an application never submits anything.
+- Membership process is shown only when the official listing states it (quoted on the profile with its source):
+  Comedy League (auditions) and Best Buddies (membership application) require one; Chess Club, Outing Club and UMass
+  Gaming and Esports Club are open. No official deadlines or application links are published, so the app shows
+  *Deadline not listed*; every other club shows *Application process not listed*.
 - Courses, the weekly class schedule, deadlines and sample events are fictional demo data, generated relative to today.
 
 ## Project structure
@@ -102,8 +111,8 @@ Club and event data come from public feeds and are committed as a dated snapshot
 ```
 src/
   data/        clubs.ts + verifiedEvents.ts (Campus Pulse), courses.ts + events.ts (demo)
-  lib/         dates, schedule builder + overlap detection, fit.ts (Find My Fit)
-  context/     StoreContext (follows, saves, reviews), ToastContext
+  lib/         dates, schedule builder + overlap detection, fit.ts (Find My Fit), applications.ts (statuses, demo org)
+  context/     StoreContext (follows, saves, reviews, applications), ToastContext
   components/  AppShell, GlobalNav, cards, reviews, shared UI
   pages/       Dashboard, placeholders, clubs/* (MyClubs pages)
 ```
