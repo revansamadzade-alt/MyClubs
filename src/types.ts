@@ -2,6 +2,8 @@ export type CoverVariant = 'solid' | 'circuit' | 'dots' | 'forest' | 'waves' | '
 
 export type Category =
   | 'Technology'
+  | 'Engineering'
+  | 'Business'
   | 'Academic'
   | 'Arts & Music'
   | 'Sports & Recreation'
@@ -20,6 +22,11 @@ export interface Meeting {
   label?: string;
 }
 
+export interface ClubLink {
+  label: string;
+  url: string;
+}
+
 export interface Club {
   id: string;
   name: string;
@@ -28,13 +35,16 @@ export interface Club {
   tags: string[];
   summary: string;
   about: string;
+  /** Only schedules stated on the official listing with day, start and end time. */
   meetings: Meeting[];
-  location: string;
-  members: number;
+  /** Schedule information as listed, including incomplete schedules that are not put on the calendar. */
+  scheduleNote?: string;
+  location?: string;
   color: string;
   cover: CoverVariant;
-  email: string;
-  founded: number;
+  links: ClubLink[];
+  sourceUrl: string;
+  verifiedOn: string;
 }
 
 export interface CampusEvent {

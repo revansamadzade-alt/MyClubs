@@ -58,7 +58,7 @@ export default function Events() {
     <>
       <PageHeader
         title="Campus Events"
-        description="Find things to do on campus. Saved events are added to My Campus Life."
+        description="Find things to do on campus. Saved events are added to My Campus Life. These are sample events for the demo, not real listings, and they are not linked to any organization."
       />
 
       <div className="mb-4 flex gap-1 overflow-x-auto border-b border-line" role="group" aria-label="Event lists">
@@ -123,8 +123,8 @@ export default function Events() {
             </button>
           }
         >
-          {view === 'clubs' && !followed.length
-            ? 'Follow some clubs to see their events here.'
+          {view === 'clubs'
+            ? 'No verified events from the clubs you follow yet. Real club events will appear here once they are verified.'
             : 'Try another keyword, category or date range.'}
         </EmptyState>
       )}

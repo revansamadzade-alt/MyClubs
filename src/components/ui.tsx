@@ -18,7 +18,7 @@ export function PageHeader({ title, description, actions }: { title: string; des
   );
 }
 
-export function SampleBadge({ className }: { className?: string }) {
+export function SampleBadge({ className, label = 'Sample data' }: { className?: string; label?: string }) {
   return (
     <span
       className={cx(
@@ -26,7 +26,7 @@ export function SampleBadge({ className }: { className?: string }) {
         className,
       )}
     >
-      Sample data
+      {label}
     </span>
   );
 }

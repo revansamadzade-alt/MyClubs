@@ -3,7 +3,10 @@ import { fromToday } from '../lib/dates';
 
 type Seed = Omit<CampusEvent, 'start' | 'end'> & { day: number; from: string; to: string };
 
-/** SAMPLE DATA. Fictional events generated relative to today so the demo always shows upcoming items. */
+/**
+ * SAMPLE DATA. Fictional events generated relative to today so the demo always shows upcoming items.
+ * They are not linked to any real organization; real events will be added only after verification.
+ */
 const SEEDS: Seed[] = [
   {
     id: 'ev-library-workshop',
@@ -20,8 +23,7 @@ const SEEDS: Seed[] = [
     day: 1, from: '20:00', to: '21:30',
     location: 'Totman Gym, Dance Studio',
     category: 'Arts & Music',
-    clubId: 'dance',
-    host: 'Fusion Dance Collective',
+    host: 'Sample host (demo data)',
     description: 'Learn a short hip hop combo in 90 minutes. Wear comfortable shoes — no dance experience needed.',
   },
   {
@@ -30,8 +32,7 @@ const SEEDS: Seed[] = [
     day: 2, from: '18:00', to: '19:30',
     location: 'Lederle Graduate Research Center, Room A112',
     category: 'Technology',
-    clubId: 'hack-collective',
-    host: 'Minuteman Hack Collective',
+    host: 'Sample host (demo data)',
     description: 'Never been to a hackathon? Learn how to form a team, scope a project for 24 hours and demo it confidently. Pizza provided.',
   },
   {
@@ -40,8 +41,7 @@ const SEEDS: Seed[] = [
     day: 2, from: '13:00', to: '15:00',
     location: 'Computer Science Building, Room 151',
     category: 'Career',
-    clubId: 'women-in-computing',
-    host: 'Women in Computing Circle',
+    host: 'Sample host (demo data)',
     description: 'Drop in for 15-minute resume reviews with volunteer mentors from local tech companies. Bring a printed or digital copy.',
   },
   {
@@ -50,8 +50,7 @@ const SEEDS: Seed[] = [
     day: 3, from: '19:00', to: '21:30',
     location: 'Computer Science Building, Room 142',
     category: 'Technology',
-    clubId: 'cyber-defense',
-    host: 'Cyber Defense Club',
+    host: 'Sample host (demo data)',
     description: 'Team up and solve beginner-to-advanced security puzzles in a sandboxed environment. Laptops required.',
   },
   {
@@ -60,8 +59,7 @@ const SEEDS: Seed[] = [
     day: 3, from: '19:30', to: '21:30',
     location: 'Integrative Learning Center, S240',
     category: 'Arts & Music',
-    clubId: 'film',
-    host: 'Cinema Society',
+    host: 'Sample host (demo data)',
     description: 'An evening of short films made by students, followed by a Q&A with the filmmakers.',
   },
   {
@@ -70,8 +68,7 @@ const SEEDS: Seed[] = [
     day: 4, from: '06:00', to: '09:30',
     location: 'Meet at Haigis Mall bus stop',
     category: 'Sports & Recreation',
-    clubId: 'outing',
-    host: 'Outdoor Adventure Club',
+    host: 'Sample host (demo data)',
     description: 'An easy 2-mile hike to catch the sunrise over the Connecticut River valley. Transportation provided; dress in layers.',
   },
   {
@@ -98,8 +95,7 @@ const SEEDS: Seed[] = [
     day: 5, from: '19:00', to: '23:00',
     location: 'Campus Center, Room 163',
     category: 'Gaming',
-    clubId: 'esports',
-    host: 'Esports & Gaming Guild',
+    host: 'Sample host (demo data)',
     description: 'Double-elimination bracket with casual setups on the side. Free entry, prizes for the top three.',
   },
   {
@@ -108,8 +104,7 @@ const SEEDS: Seed[] = [
     day: 6, from: '18:00', to: '19:30',
     location: 'Integrative Learning Center, S131',
     category: 'Academic',
-    clubId: 'data-science',
-    host: 'Data Science Society',
+    host: 'Sample host (demo data)',
     description: 'Five-minute talks from students showing their favorite visualizations — and what they learned making them.',
   },
   {
@@ -118,8 +113,7 @@ const SEEDS: Seed[] = [
     day: 6, from: '16:00', to: '18:00',
     location: 'Boyden Fields',
     category: 'Sports & Recreation',
-    clubId: 'ultimate',
-    host: 'Ultimate Frisbee Club',
+    host: 'Sample host (demo data)',
     description: 'Pickup games for all levels. Great way to try the sport before joining practice.',
   },
   {
@@ -128,8 +122,7 @@ const SEEDS: Seed[] = [
     day: 7, from: '18:00', to: '20:30',
     location: 'Isenberg School of Management, Room 120',
     category: 'Career',
-    clubId: 'entrepreneurs',
-    host: 'Student Entrepreneurs Club',
+    host: 'Sample host (demo data)',
     description: 'Student teams pitch to a panel of local founders. Audience vote decides the crowd favorite.',
   },
   {
@@ -138,8 +131,7 @@ const SEEDS: Seed[] = [
     day: 7, from: '16:00', to: '17:30',
     location: 'Campus Center, Room 904',
     category: 'Media',
-    clubId: 'newspaper',
-    host: 'The Campus Ledger',
+    host: 'Sample host (demo data)',
     description: 'Learn how to pitch, report and write your first story for the paper. Editors will be there to answer questions.',
   },
   {
@@ -148,8 +140,7 @@ const SEEDS: Seed[] = [
     day: 8, from: '19:30', to: '21:30',
     location: 'Bowker Auditorium',
     category: 'Arts & Music',
-    clubId: 'a-cappella',
-    host: 'Valley Tones A Cappella',
+    host: 'Sample host (demo data)',
     description: 'Campus a cappella groups perform their fall sets. Free admission.',
   },
   {
@@ -158,8 +149,7 @@ const SEEDS: Seed[] = [
     day: 8, from: '13:00', to: '16:00',
     location: 'Integrative Learning Center Atrium',
     category: 'Technology',
-    clubId: 'robotics',
-    host: 'Pioneer Valley Robotics Society',
+    host: 'Sample host (demo data)',
     description: 'See this season’s competition robots in action and try driving one yourself.',
   },
   {
@@ -168,8 +158,7 @@ const SEEDS: Seed[] = [
     day: 9, from: '17:00', to: '20:00',
     location: 'Student Union Ballroom',
     category: 'Cultural',
-    clubId: 'intl',
-    host: 'International Students Association',
+    host: 'Sample host (demo data)',
     description: 'Taste dishes from around the world prepared by student cultural organizations. Vegetarian options at every table.',
   },
   {
@@ -178,8 +167,7 @@ const SEEDS: Seed[] = [
     day: 10, from: '09:00', to: '12:00',
     location: 'Campus Pond, north lawn',
     category: 'Service',
-    clubId: 'sustainability',
-    host: 'Green Campus Coalition',
+    host: 'Sample host (demo data)',
     description: 'Gloves, bags and coffee provided. Counts toward service-learning hours.',
   },
   {
@@ -188,8 +176,7 @@ const SEEDS: Seed[] = [
     day: 11, from: '19:00', to: '20:30',
     location: 'Herter Hall, Room 227',
     category: 'Academic',
-    clubId: 'debate',
-    host: 'Debate & Forensics Union',
+    host: 'Sample host (demo data)',
     description: 'Two teams debate whether generative AI should be allowed in coursework. Audience Q&A follows.',
   },
   {
@@ -198,8 +185,7 @@ const SEEDS: Seed[] = [
     day: 12, from: '12:15', to: '13:00',
     location: 'Recreation Center, Studio 2',
     category: 'Wellness',
-    clubId: 'mindfulness',
-    host: 'Mindful Minutemen',
+    host: 'Sample host (demo data)',
     description: 'A short guided session with breathing techniques you can use before exams.',
   },
 ];

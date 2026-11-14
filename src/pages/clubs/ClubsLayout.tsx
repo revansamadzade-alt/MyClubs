@@ -66,7 +66,7 @@ export default function ClubsLayout() {
           </ol>
         </nav>
         <span className="hidden sm:block">
-          <SampleBadge />
+          <SampleBadge label="Sample events & courses" />
         </span>
         <button
           type="button"

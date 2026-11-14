@@ -9,7 +9,7 @@ import { ChipGroup, EmptyState, PageHeader, SearchInput } from '../../components
 import { useTitle } from '../../hooks/useTitle';
 
 type Show = 'all' | 'following' | 'not';
-type Sort = 'name' | 'members';
+type Sort = 'name' | 'name-desc';
 
 export default function Discover() {
   useTitle('Discover');
@@ -36,14 +36,18 @@ export default function Discover() {
       const f = followed.includes(c.id);
       if (show === 'following' && !f) return false;
       if (show === 'not' && f) return false;
-      const hay = [c.name, c.summary, c.about, c.category, c.location, ...c.tags].join(' ').toLowerCase();
+      const hay = [c.name, c.summary, c.about, c.category, c.location ?? '', c.scheduleNote ?? '', ...c.tags].join(' ').toLowerCase();
       return terms.every((t) => hay.includes(t));
-    }).sort(sort === 'members' ? (a, b) => b.members - a.members : (a, b) => a.name.localeCompare(b.name));
+    }).sort((a, b) => (sort === 'name-desc' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)));
   }, [q, cat, show, sort, followed]);
 
   const categoryOptions = [
     { value: 'All' as const, label: 'All', count: CLUBS.length },
-    ...CATEGORIES.map((c) => ({ value: c, label: c, count: CLUBS.filter((x) => x.category === c).length })),
+    ...CATEGORIES.filter((c) => CLUBS.some((x) => x.category === c)).map((c) => ({
+      value: c,
+      label: c,
+      count: CLUBS.filter((x) => x.category === c).length,
+    })),
   ];
 
   const hasFilters = q || cat !== 'All' || show !== 'all';
@@ -52,7 +56,7 @@ export default function Discover() {
     <>
       <PageHeader
         title="Discover Student Organizations"
-        description="Browse student organizations, follow the ones you're curious about, and their meetings will show up in My Campus Life."
+        description="Real UMass Amherst student organizations from their public Campus Pulse listings. Follow the ones you're curious about; listed meeting schedules show up in My Campus Life."
       />
 
       <div className="space-y-3 rounded border border-line bg-surface p-4">
@@ -61,7 +65,7 @@ export default function Discover() {
             value={q}
             onChange={(v) => update('q', v, '')}
             label="Search clubs"
-            placeholder="Search by name or keyword (e.g. robotics, hiking, startups)"
+            placeholder="Search by name or keyword (e.g. robotics, a cappella, consulting)"
           />
           <div className="flex gap-3">
             <label className="flex-1 sm:w-44 sm:flex-none">
@@ -76,7 +80,7 @@ export default function Discover() {
               <span className="sr-only">Sort by</span>
               <select value={sort} onChange={(e) => update('sort', e.target.value, 'name')} className="input">
                 <option value="name">Name (A–Z)</option>
-                <option value="members">Most members</option>
+                <option value="name-desc">Name (Z–A)</option>
               </select>
             </label>
           </div>

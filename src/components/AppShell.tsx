@@ -7,8 +7,9 @@ function PrototypeFooter() {
   return (
     <footer className="mt-10 border-t border-line-soft px-6 py-5 text-xs leading-relaxed text-ink-soft md:px-12">
       <strong className="font-bold text-ink">MyClubs</strong> is an independent HackUMass 2026 prototype. It is not affiliated
-      with, endorsed by, or connected to UMass Amherst or Instructure Canvas. All courses, clubs, events and deadlines shown
-      are sample data. Follows, saved events and reviews are stored only in this browser.
+      with, endorsed by, or connected to UMass Amherst or Instructure Canvas. Club listings come from public Campus Pulse
+      pages; courses, deadlines and events shown are sample data. Follows, saved events and reviews are stored only in this
+      browser.
     </footer>
   );
 }

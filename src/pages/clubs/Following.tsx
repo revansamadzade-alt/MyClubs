@@ -72,10 +72,12 @@ export default function Following() {
                     </Link>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
                       <CategoryTag category={club.category} />
-                      {next && (
+                      {next ? (
                         <span className="inline-flex items-center gap-1">
                           <CalendarClock size={14} aria-hidden /> Next: {fmtDate(next)}, {fmtTime(next)}
                         </span>
+                      ) : (
+                        <span className="italic">Meeting times not listed</span>
                       )}
                     </div>
                   </div>
@@ -117,7 +119,7 @@ export default function Following() {
                         {relativeDay(item.start)} · {fmtRange(item.start, item.end)}
                       </p>
                       <p className="truncate text-xs text-ink-soft">
-                        {event ? `Event · ${item.subtitle}` : `${item.subtitle} · ${item.location}`}
+                        {event ? `Event · ${item.subtitle}` : [item.subtitle, item.location].filter(Boolean).join(' · ')}
                       </p>
                       {event && (
                         <div className="mt-2">
@@ -130,7 +132,10 @@ export default function Following() {
               })}
             </ul>
           ) : (
-            <p className="text-ink-soft">No upcoming activity from your clubs.</p>
+            <p className="text-ink-soft">
+              No verified meetings or events listed for the clubs you follow in the next 14 days. Only schedules stated on
+              Campus Pulse are shown.
+            </p>
           )}
         </section>
       </div>

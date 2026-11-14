@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Clock, MapPin, UsersRound } from 'lucide-react';
+import { BadgeCheck, Clock, MapPin } from 'lucide-react';
 import type { Club } from '../types';
 import { meetingLabel } from '../lib/dates';
 import { useStore } from '../context/StoreContext';
@@ -12,6 +12,7 @@ export function ClubCard({ club }: { club: Club }) {
   const href = `/clubs/discover/${club.id}`;
   // Remember the Discover filters so the profile's back link can restore them.
   const linkState = { discoverSearch: useLocation().search };
+  const schedule = club.meetings.length ? club.meetings.map(meetingLabel).join('; ') : (club.scheduleNote ?? 'Meeting times not listed');
 
   return (
     <article className="flex flex-col overflow-hidden rounded border border-line bg-white transition-shadow hover:shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
@@ -32,24 +33,26 @@ export function ClubCard({ club }: { club: Club }) {
         </h3>
         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
           <CategoryTag category={club.category} />
-          <span className="inline-flex items-center gap-1">
-            <UsersRound size={13} aria-hidden /> {club.members} members
+          <span className="inline-flex items-center gap-1" title={`From the official Campus Pulse listing, retrieved ${club.verifiedOn}`}>
+            <BadgeCheck size={13} aria-hidden className="text-success" /> Campus Pulse
           </span>
         </div>
         <p className="mt-2 line-clamp-2 text-sm text-ink-soft">{club.summary}</p>
-        <dl className="mt-3 space-y-1 text-[0.8125rem] text-ink">
+        <dl className="mt-3 space-y-1 text-[0.8125rem]">
           <div className="flex gap-1.5">
             <dt>
               <Clock size={14} className="mt-0.5 text-ink-soft" aria-label="Meets" />
             </dt>
-            <dd>{club.meetings.map(meetingLabel).join('; ')}</dd>
+            <dd className={club.meetings.length ? 'text-ink' : 'italic text-ink-soft'}>{schedule}</dd>
           </div>
-          <div className="flex gap-1.5">
-            <dt>
-              <MapPin size={14} className="mt-0.5 text-ink-soft" aria-label="Location" />
-            </dt>
-            <dd>{club.location}</dd>
-          </div>
+          {club.location && (
+            <div className="flex gap-1.5">
+              <dt>
+                <MapPin size={14} className="mt-0.5 text-ink-soft" aria-label="Location" />
+              </dt>
+              <dd className="text-ink">{club.location}</dd>
+            </div>
+          )}
         </dl>
         <div className="mt-auto flex flex-wrap gap-2 pt-4">
           <FollowButton club={club} size="sm" />

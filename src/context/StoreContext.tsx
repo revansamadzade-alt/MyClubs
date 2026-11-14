@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import type { Review } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useToast } from './ToastContext';
@@ -6,8 +6,21 @@ import { CLUB_BY_ID } from '../data/clubs';
 import { EVENT_BY_ID } from '../data/events';
 
 /** Demo defaults so My Clubs and My Campus Life have content on first load. */
-const SEED_FOLLOWED = ['hack-collective', 'data-science'];
-const SEED_SAVED = ['ev-career-fair'];
+const SEED_FOLLOWED = ['chessclub', 'roboticsclub'];
+const SEED_SAVED = ['ev-career-fair', 'ev-acappella'];
+
+/** Follows of earlier fictional demo clubs that have a genuine real equivalent. */
+const LEGACY_CLUB_IDS: Record<string, string> = { robotics: 'roboticsclub', chess: 'chessclub', outing: 'umoc' };
+const LEGACY_SEED = ['hack-collective', 'data-science'];
+
+function normalizeFollowed(ids: string[]): string[] {
+  if (ids.length === LEGACY_SEED.length && LEGACY_SEED.every((id) => ids.includes(id))) return SEED_FOLLOWED;
+  return [...new Set(ids.map((id) => LEGACY_CLUB_IDS[id] ?? id))].filter((id) => CLUB_BY_ID[id]);
+}
+
+function normalizeSaved(ids: string[]): string[] {
+  return [...new Set(ids)].filter((id) => EVENT_BY_ID[id]);
+}
 
 const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
 
@@ -53,9 +66,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [savedRaw, setSaved] = useLocalStorage<string[]>(KEYS.saved, SEED_SAVED, isStringArray);
   const [reviews, setReviews] = useLocalStorage<Review[]>(KEYS.reviews, [], isReviewArray);
 
-  // Drop duplicates and ids that no longer exist in the sample data.
-  const followed = useMemo(() => [...new Set(followedRaw)].filter((id) => CLUB_BY_ID[id]), [followedRaw]);
-  const saved = useMemo(() => [...new Set(savedRaw)].filter((id) => EVENT_BY_ID[id]), [savedRaw]);
+  const followed = useMemo(() => normalizeFollowed(followedRaw), [followedRaw]);
+  const saved = useMemo(() => normalizeSaved(savedRaw), [savedRaw]);
+
+  // Persist migrated/cleaned lists once so toggles operate on clean data.
+  useEffect(() => {
+    if (followed.join() !== followedRaw.join()) setFollowed(followed);
+  }, [followed, followedRaw, setFollowed]);
+  useEffect(() => {
+    if (saved.join() !== savedRaw.join()) setSaved(saved);
+  }, [saved, savedRaw, setSaved]);
 
   const isFollowing = useCallback((id: string) => followed.includes(id), [followed]);
   const isSaved = useCallback((id: string) => saved.includes(id), [saved]);
@@ -64,7 +84,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       const name = CLUB_BY_ID[id]?.name ?? 'club';
       const was = followed.includes(id);
-      setFollowed((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+      setFollowed((prev) => {
+        const cur = normalizeFollowed(prev);
+        return cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+      });
       notify(was ? `Unfollowed ${name}.` : `Following ${name}. Its meetings now appear in My Campus Life.`);
     },
     [followed, notify, setFollowed],
@@ -74,7 +97,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       const title = EVENT_BY_ID[id]?.title ?? 'event';
       const was = saved.includes(id);
-      setSaved((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+      setSaved((prev) => {
+        const cur = normalizeSaved(prev);
+        return cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+      });
       notify(was ? `Removed “${title}” from saved events.` : `Saved “${title}” to My Campus Life.`);
     },
     [saved, notify, setSaved],

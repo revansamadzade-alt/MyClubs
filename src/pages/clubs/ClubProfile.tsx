@@ -1,5 +1,5 @@
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarClock, Clock, Info, Mail, MapPin, SearchX, UsersRound } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, CalendarClock, Clock, ExternalLink, Info, MapPin, SearchX } from 'lucide-react';
 import { CLUB_BY_ID } from '../../data/clubs';
 import { EVENTS } from '../../data/events';
 import { DOW_PLURAL, fmtDate, fmtTime, hhmmRange } from '../../lib/dates';
@@ -7,7 +7,7 @@ import { nextMeeting } from '../../lib/schedule';
 import { PatternCover } from '../../components/PatternCover';
 import { EventCard } from '../../components/EventCard';
 import { Reviews } from '../../components/Reviews';
-import { CategoryTag, ClubAvatar, EmptyState, FollowButton, SampleBadge } from '../../components/ui';
+import { CategoryTag, ClubAvatar, EmptyState, FollowButton } from '../../components/ui';
 import { useTitle } from '../../hooks/useTitle';
 
 export default function ClubProfile() {
@@ -53,10 +53,15 @@ export default function ClubProfile() {
             <h1 className="text-2xl font-bold leading-tight text-ink sm:text-[1.75rem]">{club.name}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
               <CategoryTag category={club.category} />
-              <span className="inline-flex items-center gap-1">
-                <UsersRound size={15} aria-hidden /> {club.members} members
-              </span>
-              <SampleBadge />
+              <a
+                href={club.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-link hover:underline"
+              >
+                <BadgeCheck size={15} aria-hidden className="text-success" /> Verified on Campus Pulse
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
             </div>
           </div>
           <FollowButton club={club} />
@@ -90,7 +95,13 @@ export default function ClubProfile() {
                 ))}
               </div>
             ) : (
-              <p className="text-ink-soft">No special events posted. Regular meetings are listed on the right.</p>
+              <p className="text-ink-soft">
+                No verified upcoming events yet. Check{' '}
+                <a href={`${club.sourceUrl}/events`} target="_blank" rel="noopener noreferrer" className="text-link hover:underline">
+                  this organization's Campus Pulse events
+                </a>
+                .
+              </p>
             )}
           </section>
 
@@ -102,33 +113,63 @@ export default function ClubProfile() {
             <h2 className="mb-3 flex items-center gap-2 font-bold">
               <CalendarClock size={18} aria-hidden className="text-umass" /> Meetings
             </h2>
-            <ul className="space-y-2 text-sm">
-              {club.meetings.map((m, i) => (
-                <li key={i}>
-                  <span className="font-bold">{DOW_PLURAL[m.dow]}</span>
-                  {m.label && <span className="text-ink-soft"> · {m.label}</span>}
-                  <span className="flex items-center gap-1.5 text-ink">
-                    <Clock size={14} aria-hidden className="text-ink-soft" /> {hhmmRange(m.start, m.end)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {club.meetings.length ? (
+              <ul className="space-y-2 text-sm">
+                {club.meetings.map((m, i) => (
+                  <li key={i}>
+                    <span className="font-bold">{DOW_PLURAL[m.dow]}</span>
+                    {m.label && <span className="text-ink-soft"> · {m.label}</span>}
+                    <span className="flex items-center gap-1.5 text-ink">
+                      <Clock size={14} aria-hidden className="text-ink-soft" /> {hhmmRange(m.start, m.end)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm font-bold text-ink">No verified meeting schedule</p>
+            )}
+            {club.scheduleNote && <p className="mt-2 text-sm text-ink-soft">{club.scheduleNote}</p>}
             <p className="mt-3 flex gap-1.5 text-sm">
-              <MapPin size={14} aria-hidden className="mt-0.5 shrink-0 text-ink-soft" /> {club.location}
+              <MapPin size={14} aria-hidden className="mt-0.5 shrink-0 text-ink-soft" />
+              {club.location ?? <span className="italic text-ink-soft">Location not listed</span>}
             </p>
             {next && (
               <p className="mt-3 rounded bg-surface px-3 py-2 text-sm">
                 Next meeting: <strong>{fmtDate(next)}</strong> at {fmtTime(next)}
               </p>
             )}
+            {!club.meetings.length && (
+              <p className="mt-3 text-xs text-ink-soft">Nothing from this club is added to your calendar until a full schedule is listed.</p>
+            )}
           </div>
 
           <div className="card p-4 text-sm">
-            <h2 className="mb-2 font-bold">Contact</h2>
-            <a href={`mailto:${club.email}`} className="flex items-center gap-1.5 text-link hover:underline">
-              <Mail size={14} aria-hidden /> {club.email}
-            </a>
-            <p className="mt-2 text-ink-soft">Founded {club.founded} (sample)</p>
+            <h2 className="mb-2 font-bold">Official links & contact</h2>
+            {club.links.length ? (
+              <ul className="space-y-1.5">
+                {club.links.map((l) => (
+                  <li key={l.url}>
+                    <a href={l.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-link hover:underline">
+                      <ExternalLink size={14} aria-hidden /> {l.label}
+                      <span className="sr-only"> (opens in a new tab)</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="italic text-ink-soft">No external links listed.</p>
+            )}
+            <p className="mt-3 text-ink-soft">
+              Contact this organization through its{' '}
+              <a href={club.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-link hover:underline">
+                Campus Pulse page
+              </a>
+              . Membership size is not listed.
+            </p>
+            <p className="mt-2 text-xs text-ink-soft">
+              Source: Campus Pulse listing, retrieved{' '}
+              {new Date(`${club.verifiedOn}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.
+            </p>
           </div>
 
           <div className="flex gap-2 rounded border border-[#b3d7ee] bg-[#eef6fb] p-4 text-sm text-ink">

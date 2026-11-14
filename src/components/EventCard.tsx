@@ -4,7 +4,7 @@ import type { CampusEvent } from '../types';
 import { CLUB_BY_ID } from '../data/clubs';
 import { fmtRange, relativeDay } from '../lib/dates';
 import { useStore } from '../context/StoreContext';
-import { CategoryTag, DateTile, SaveEventButton } from './ui';
+import { CategoryTag, DateTile, SampleBadge, SaveEventButton } from './ui';
 
 export function EventCard({ event, compact }: { event: CampusEvent; compact?: boolean }) {
   const { isFollowing } = useStore();
@@ -18,6 +18,7 @@ export function EventCard({ event, compact }: { event: CampusEvent; compact?: bo
         {!compact && (
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <CategoryTag category={event.category} />
+            <SampleBadge label="Sample event" />
             {club && isFollowing(club.id) && (
               <span className="rounded-full bg-[#f8ecec] px-2 py-0.5 text-xs font-bold text-umass">Club you follow</span>
             )}
