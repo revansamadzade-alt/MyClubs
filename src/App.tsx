@@ -18,6 +18,10 @@ const Applications = lazy(() => import('./pages/clubs/Applications'));
 const ApplicationDetail = lazy(() => import('./pages/clubs/ApplicationDetail'));
 const ApplyForm = lazy(() => import('./pages/clubs/ApplyForm'));
 const ApplicantProfilePage = lazy(() => import('./pages/clubs/ApplicantProfile'));
+// ClubFund (Supabase + wallet code) loads only when a ClubFund page is opened.
+const ClubFundLayout = lazy(() => import('./pages/clubs/clubfund/ClubFundLayout'));
+const ClubFundHome = lazy(() => import('./pages/clubs/clubfund/ClubFundHome'));
+const WalletSettings = lazy(() => import('./pages/clubs/clubfund/WalletSettings'));
 
 function Loading() {
   return (
@@ -47,6 +51,10 @@ export default function App() {
           <Route path="events" element={page(<Events />)} />
           <Route path="events/:eventId" element={page(<EventDetail />)} />
           <Route path="campus-life" element={page(<CampusLife />)} />
+          <Route path="clubfund" element={page(<ClubFundLayout />)}>
+            <Route index element={page(<ClubFundHome />)} />
+            <Route path="settings" element={page(<WalletSettings />)} />
+          </Route>
         </Route>
         {NAV_ITEMS.filter((n) => n.prototype).map((item) => (
           <Route key={item.to} path={item.to.slice(1)} element={<Placeholder item={item} />} />

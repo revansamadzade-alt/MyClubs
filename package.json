@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "test": "node --test tests/unit.test.mjs tests/feeds.test.mjs",
+    "typecheck": "tsc --noEmit && tsc -p supabase/functions/tsconfig.json",
+    "test": "node --test tests/unit.test.mjs tests/feeds.test.mjs tests/clubfund.test.mjs tests/clubfund-db.test.mjs",
     "test:e2e": "node tests/e2e/qa.mjs",
     "sync:data": "node scripts/sync-data.mjs",
     "build:fresh": "node scripts/build-fresh.mjs",
@@ -16,12 +16,20 @@
     "test:all": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
+    "@solana/wallet-standard-features": "^1.5.0",
+    "@supabase/supabase-js": "^2.119.0",
+    "@wallet-standard/app": "^1.1.1",
+    "@wallet-standard/base": "^1.1.1",
+    "@wallet-standard/features": "^1.1.1",
     "lucide-react": "^0.511.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
+    "@noble/curves": "^2.4.0",
+    "@scure/base": "^2.4.0",
     "@tailwindcss/vite": "^4.1.8",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",

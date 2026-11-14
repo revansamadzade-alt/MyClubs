@@ -134,7 +134,17 @@ const ready = `document.readyState === 'complete' && !window.__leaving && docume
 const markLeaving = (call) => evalIn(call, 'window.__leaving = true; return true').catch(() => {});
 async function goto(path, call = send) { await markLeaving(call); await call('Page.navigate', { url: BASE + path }); await waitFor(ready, 8000, call); await settle(call); }
 async function reload() { await markLeaving(send); await send('Page.reload', {}); await waitFor(ready, 8000); await settle(); }
-async function click(expr, _legacy, call = send) { await evalIn(call, `const el = ${expr}; if (!el) throw new Error('not found: ' + ${JSON.stringify(expr)}); el.click(); return true`); await settle(call); }
+// When a click opens another page, the URL changes first and the lazily loaded page renders (and sets its title) a
+// moment later; until then React keeps the old page on screen. Wait for the new title before checking anything.
+async function click(expr, _legacy, call = send) {
+  const before = await evalIn(call, `const el = ${expr}; if (!el) throw new Error('not found: ' + ${JSON.stringify(expr)}); const s = { path: location.pathname, title: document.title }; el.click(); return s`);
+  await settle(call);
+  const moved = await evalIn(call, `return location.pathname !== ${JSON.stringify(before.path)}`).catch(() => false);
+  if (moved) {
+    await waitFor(`document.title !== ${JSON.stringify(before.title)}`, 8000, call);
+    await settle(call);
+  }
+}
 const path = () => ev(`return location.pathname + location.search`);
 async function viewport(width, height = 900) { await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 768 }); }
 async function shot(name) { const r = await send('Page.captureScreenshot', { format: 'png' }); writeFileSync(join(OUT, `${name}.png`), Buffer.from(r.result.data, 'base64')); }
@@ -221,7 +231,7 @@ await section('3 Sort', async () => {
 await section('4 Profile', async () => {
   await goto('/clubs/discover?cat=Technology');
   await click(`card('Women in Cybersecurity at UMass Amherst').querySelector('h3 a')`);
-  await waitFor(`location.pathname === '/clubs/discover/womenincybersecurity'`);
+  await waitFor(`location.pathname === '/clubs/discover/womenincybersecurity' && $('main h1')?.textContent.trim() .includes('Women in Cybersecurity')`, 8000);
   check('4 Profile', 'card title opens profile', (await path()) === '/clubs/discover/womenincybersecurity', await path());
   check('4 Profile', 'profile h1 + document.title', await ev(`return $('main h1').textContent.trim() === 'Women in Cybersecurity at UMass Amherst' && document.title.startsWith('Women in Cybersecurity')`));
   check('4 Profile', 'breadcrumb shows club', await ev(`return $('nav[aria-label=Breadcrumb]').textContent.includes('Women in Cybersecurity')`));
@@ -412,7 +422,7 @@ await section('13 Real data', async () => {
 await section('10 Nav', async () => {
   await goto('/');
   await click(`byText('nav[aria-label="Global navigation"] a', 'MyClubs')`);
-  await waitFor(`location.pathname === '/clubs/discover'`);
+  await waitFor(`location.pathname === '/clubs/discover' && $('main h1')?.textContent.trim() .includes('Discover Student Organizations')`, 8000);
   check('10 Nav', 'global MyClubs → /clubs/discover', (await path()) === '/clubs/discover');
   for (const [label, p, h1] of [['My Clubs & Associations', '/clubs/following', 'My Clubs & Associations'], ['Campus Events', '/clubs/events', 'Campus Events'], ['My Campus Life', '/clubs/campus-life', 'My Campus Life'], ['Discover', '/clubs/discover', 'Discover Student Organizations']]) {
     await click(`byText('#clubs-nav a', ${JSON.stringify(label)})`);
@@ -624,7 +634,7 @@ await section('15 Find My Fit', async () => {
 
   // Journey: dashboard → MyClubs → Discover → Find My Fit
   await click(`byText('nav[aria-label="Global navigation"] a', 'MyClubs')`);
-  await waitFor(`location.pathname === '/clubs/discover'`);
+  await waitFor(`location.pathname === '/clubs/discover' && $('main h1')?.textContent.trim() .includes('Discover Student Organizations')`, 8000);
   await click(`byText('main a', 'Find My Fit')`);
   await waitFor(`$('#group-fits') && $('#group-unknown')`);
   check('F Fit', 'Discover "Find My Fit" button opens page', (await path()) === '/clubs/fit', '/clubs/applications', '/clubs/applications/demo-org', await path());
@@ -823,12 +833,12 @@ await section('20 Applications', async () => {
 
   await goto('/clubs/discover/comedyleague');
   await click(`byText('main header button', 'Apply')`);
-  await waitFor(`location.pathname === '/clubs/applications/comedyleague/apply'`);
+  await waitFor(`location.pathname === '/clubs/applications/comedyleague/apply' && $('main h1')?.textContent.trim() .includes('Apply to Comedy League')`, 8000);
   check('P Apps', 'Apply opens that organization\'s application form', (await ev(`const t = $('main').textContent; return $('main h1').textContent === 'Apply to Comedy League' && t.includes('Application link not available') && t.includes('MyClubs never submits anything')`)));
   check('P Apps', 'Apply saves it as Interested', await ev(`const a = ls('myclubs:applications'); return a.length === 1 && a[0].clubId === 'comedyleague' && a[0].status === 'interested'`));
   await goto('/clubs/discover/comedyleague');
   await click(`byText('main header button', 'View application')`);
-  await waitFor(`location.pathname === '/clubs/applications/comedyleague'`);
+  await waitFor(`location.pathname === '/clubs/applications/comedyleague' && $('main h1')?.textContent.trim() === 'Comedy League'`, 8000);
   check('P Apps', 'Apply again: View application, no duplicate', (await ev(`return ls('myclubs:applications').length`)) === 1);
   await ev(`typeInto($('main select'), 'draft'); typeInto($('main input[type=url]'), 'not a link'); return true`);
   await click(`byText('main button', 'Save tracker')`);
@@ -910,7 +920,7 @@ await section('21 Application forms', async () => {
   check(A, 'demo organization discoverable and labeled', await ev(`const c = $('[data-testid=demo-org-card]'); return !!c && c.textContent.includes('Demo organization') && c.textContent.includes('Application required (demo)') && !c.querySelector('button[aria-pressed]')`));
   check(A, 'demo card does not change real directory counts', await ev(`return cards().length === 2 && $('main').textContent.includes('Showing 2 of 78')`));
   await click(`byText('[data-testid=demo-org-card] button', 'Apply')`);
-  await waitFor(`location.pathname === '/clubs/applications/demo-org/apply'`);
+  await waitFor(`location.pathname === '/clubs/applications/demo-org/apply' && $('main h1')?.textContent.trim() .includes('Apply to Campus Builders Collective (demo)')`, 8000);
   t = await mainText();
   check(A, 'Apply opens the form with org name, category and notice', t.includes('Apply to Campus Builders Collective (demo)') && t.includes('Engineering') && t.includes('Demo only — not sent to the organization.') && t.includes('Sample application questions'));
   check(A, 'progress indicator: 4 steps, step 1 current', await ev(`const li = $$('ol[aria-label="Application steps"] li'); return li.length === 4 && li[0].getAttribute('aria-current') === 'step'`));
@@ -998,7 +1008,7 @@ await section('21 Application forms', async () => {
   await reload();
   check(A, 'confirmation persists after refresh', (await mainText()).includes('Demo application prepared — not submitted to the organization.'));
   await click(`byText('main a', 'View in My Applications')`);
-  await waitFor(`location.pathname === '/clubs/applications'`);
+  await waitFor(`location.pathname === '/clubs/applications' && $('main h1')?.textContent.trim() === 'Applications'`, 8000);
   check(A, 'appears in My Applications as Prepared (demo)', await ev(`const c = cards().find(x => x.textContent.includes('Campus Builders Collective')); const t = c?.textContent ?? ''; return t.includes('Prepared (demo)') && t.includes('Demo organization') && t.includes('(not submitted)') && !!c.querySelector('ol[aria-label^="Progress: step 3 of 5"]') && !!byText('a', 'Review answers', c)`));
   check(A, 'nav count: Applications 1', await ev(`return /Applications\\s*1/.test($('#clubs-nav').textContent)`));
   await goto('/clubs/applications/demo-org');
@@ -1021,7 +1031,7 @@ await section('21 Application forms', async () => {
   // A real organization: prepared answers point to the official process.
   await goto('/clubs/discover/comedyleague');
   await click(`byText('main article > header button', 'Apply')`);
-  await waitFor(`location.pathname === '/clubs/applications/comedyleague/apply'`);
+  await waitFor(`location.pathname === '/clubs/applications/comedyleague/apply' && $('main h1')?.textContent.trim() .includes('Apply to Comedy League')`, 8000);
   check(A, 'personal details carry no sensitive fields', await ev(`return $$('main form [id^=f-]').length === 5 && !/pronoun|gender|ethnic|race|birth|home address|phone|student id|social security/i.test($('main form').textContent)`));
   await fill({ fullName: 'Alex Minuteman', email: 'aminuteman@umass.edu', major: 'Theater', classYear: '2029' });
   await next();
@@ -1295,7 +1305,7 @@ await section('23 Application features', async () => {
 
   // Structured decision (self-reported).
   await click(`byText('main article > header button', 'Apply')`);
-  await waitFor(`location.pathname === '/clubs/applications/comedyleague/apply'`);
+  await waitFor(`location.pathname === '/clubs/applications/comedyleague/apply' && $('main h1')?.textContent.trim() .includes('Apply to Comedy League')`, 8000);
   await goto('/clubs/applications/comedyleague');
   await ev(`typeInto($('main form select'), 'decision'); return true`);
   await waitFor(`[...$$('main select')].some((s) => [...s.options].some((o) => o.value === 'waitlisted'))`);
@@ -1474,6 +1484,239 @@ await section('24 Accessibility', async () => {
   await viewport(1440);
   await goto('/');
   await ev(`localStorage.clear(); return true`);
+});
+
+// 25. ClubFund: works without Supabase settings; then the real UI and supabase-js requests against a MOCKED Supabase
+//     backend (DevTools request interception) and a scripted Wallet Standard test wallet. This tests the UI and its
+//     error handling, not email delivery or real signature verification (those are covered by the backend tests).
+await section('25 ClubFund', async () => {
+  const A = 'W ClubFund';
+  await viewport(1440);
+  await goto('/');
+  await ev(`localStorage.clear(); return true`);
+
+  // Without Supabase settings: ClubFund explains itself; the rest of MyClubs is untouched.
+  await goto('/clubs/clubfund');
+  check(A, 'ClubFund in the MyClubs navigation', await ev(`return !!byText('#clubs-nav a', 'ClubFund')`));
+  check(A, 'not configured: clear setup message, privacy statement, no crash', await ev(`const t = $('main').textContent; return t.includes("ClubFund isn't set up") && t.includes('It is not published on the blockchain.') && !!$('main h1')`));
+  await goto('/clubs/discover');
+  check(A, 'rest of MyClubs works without Supabase', (await ev(`return cardTitles().length`)) === 78);
+
+  // A second copy of the app with ClubFund pointed at a mocked, same-origin Supabase.
+  const CF_PORT = 5175;
+  const CF = `http://localhost:${CF_PORT}`;
+  const server = spawn(process.execPath, [fileURLToPath(new URL('../../node_modules/vite/bin/vite.js', import.meta.url)), '--port', String(CF_PORT), '--strictPort'], {
+    cwd: fileURLToPath(new URL('../..', import.meta.url)),
+    env: { ...process.env, VITE_SUPABASE_URL: `${CF}/__supabase`, VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test_only' },
+    stdio: 'ignore',
+  });
+  try {
+    for (let i = 0; i < 60; i++) {
+      try {
+        if ((await fetch(CF)).ok) break;
+      } catch {}
+      await sleep(250);
+    }
+    const USER_ID = '6f1c2a8e-1111-4c2a-9a3e-2b7f0c9d4e51';
+    const ADDRESS = 'GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB';
+    const nowSec = () => Math.floor(Date.parse(`${TEST_NOW}-05:00`) / 1000);
+    const b64url = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+    const user = { id: USER_ID, aud: 'authenticated', role: 'authenticated', email: 'jdoe@umass.edu', email_confirmed_at: '2026-11-13T17:00:00Z', app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: {}, identities: [], created_at: '2026-11-13T17:00:00Z', updated_at: '2026-11-13T17:00:00Z' };
+    const session = () => {
+      const iat = nowSec();
+      const jwt = `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: USER_ID, email: user.email, role: 'authenticated', aud: 'authenticated', iat, exp: iat + 7 * 86400, amr: [{ method: 'otp', timestamp: iat }] })}.test-signature`;
+      return { access_token: jwt, token_type: 'bearer', expires_in: 7 * 86400, expires_at: iat + 7 * 86400, refresh_token: `refresh-${iat}`, user };
+    };
+    const mock = { otp: 200, linked: null, challenge: null, failLink: null, requests: [], unlink: [] };
+    const respond = async (p, call) => {
+      const url = new URL(p.request.url);
+      const path = url.pathname.replace(/^\/__supabase/, '');
+      const body = p.request.postData ? JSON.parse(p.request.postData) : null;
+      mock.requests.push({ method: p.request.method, path, body, auth: p.request.headers.Authorization ?? p.request.headers.authorization ?? null });
+      let status = 200;
+      let json = {};
+      if (path === '/auth/v1/otp') {
+        if (mock.otp === 'fail') return call('Fetch.failRequest', { requestId: p.requestId, errorReason: 'InternetDisconnected' });
+        if (mock.otp === 429) [status, json] = [429, { code: 'over_email_send_rate_limit', msg: 'For security purposes, you can only request this after 60 seconds.' }];
+      } else if (path === '/auth/v1/verify') {
+        if (body?.token === '123456' && body?.email === 'jdoe@umass.edu') json = session();
+        else [status, json] = [403, { code: 'otp_expired', msg: 'Token has expired or is invalid' }];
+      } else if (path === '/auth/v1/user') json = user;
+      else if (path === '/auth/v1/token') json = session();
+      else if (path.startsWith('/auth/v1/logout')) [status, json] = [204, null];
+      else if (path === '/rest/v1/wallet_links') json = mock.linked ? [mock.linked] : [];
+      else if (path === '/functions/v1/wallet-challenge') {
+        mock.challenge = {
+          challengeId: '0b5d7a8c-2222-4d3e-8f1a-9c0b1d2e3f40',
+          message: `localhost:${CF_PORT} wants you to sign in with your Solana account:\n${body.wallet}\n\nLink this wallet to your MyClubs ClubFund account.\n\nNonce: ${'ab'.repeat(32)}\nRequest ID: ${body.purpose}-wallet`,
+          expiresAt: new Date((nowSec() + 300) * 1000).toISOString(),
+        };
+        json = mock.challenge;
+      } else if (path === '/functions/v1/wallet-link') {
+        const signed = Buffer.from(body.signedMessage, 'base64').toString('utf8');
+        if (mock.failLink) [status, json] = [409, { error: { code: mock.failLink, message: 'This wallet is already linked to another MyClubs account.' } }];
+        else if (signed !== mock.challenge?.message) [status, json] = [400, { error: { code: 'message_mismatch', message: 'The signed message does not match the verification request. Start again.' } }];
+        else {
+          mock.linked = { wallet_address: body.wallet, chain: 'solana:devnet', linked_at: '2026-11-13T17:05:00Z', verified_at: '2026-11-13T17:05:00Z' };
+          json = { link: mock.linked };
+        }
+      } else if (path === '/functions/v1/wallet-unlink') {
+        mock.unlink.push(body);
+        mock.linked = null;
+        json = { unlinked: true };
+      } else [status, json] = [404, { message: 'not mocked' }];
+      await call('Fetch.fulfillRequest', {
+        requestId: p.requestId,
+        responseCode: status,
+        responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+        body: json === null ? '' : Buffer.from(JSON.stringify(json)).toString('base64'),
+      });
+    };
+    const FAKE_WALLET = `(() => {
+      const account = { address: ${JSON.stringify(ADDRESS)}, publicKey: new Uint8Array(32), chains: ['solana:devnet'], features: ['solana:signMessage'] };
+      const flag = (k) => localStorage.getItem('test:' + k);
+      const wallet = {
+        version: '1.0.0', name: 'Test Wallet', icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=',
+        chains: ['solana:devnet'], accounts: [],
+        features: {
+          'standard:connect': { version: '1.0.0', connect: async (input) => {
+            if (flag('reject') === 'connect') throw Object.assign(new Error('User rejected the request.'), { code: 4001 });
+            if (input?.silent && !flag('authorized')) return { accounts: [] };
+            localStorage.setItem('test:authorized', '1'); wallet.accounts = [account]; return { accounts: [account] };
+          } },
+          'standard:disconnect': { version: '1.0.0', disconnect: async () => { wallet.accounts = []; localStorage.removeItem('test:authorized'); } },
+          'standard:events': { version: '1.0.0', on: () => () => {} },
+          'solana:signMessage': { version: '1.0.0', signMessage: async ({ message }) => {
+            if (flag('reject') === 'sign') throw Object.assign(new Error('User rejected the request.'), { code: 4001 });
+            window.__signed = new TextDecoder().decode(message);
+            return [{ signedMessage: message, signature: new Uint8Array(64).fill(7) }];
+          } },
+        },
+      };
+      if (flag('noWallet')) return;
+      const reg = ({ register }) => register(wallet);
+      window.addEventListener('wallet-standard:app-ready', (e) => reg(e.detail));
+      try { window.dispatchEvent(new CustomEvent('wallet-standard:register-wallet', { detail: reg })); } catch {}
+    })();`;
+
+    const tab = await json(`/json/new?about:blank`, 'PUT');
+    const t = await connect(tab.webSocketDebuggerUrl, (m, call) => {
+      if (m.method === 'Fetch.requestPaused') void respond(m.params, call);
+      if (m.method === 'Runtime.exceptionThrown') consoleIssues.add('CLUBFUND EXCEPTION ' + (m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text).slice(0, 200));
+    });
+    await t.call('Fetch.enable', { patterns: [{ urlPattern: '*/__supabase/*', requestStage: 'Request' }] });
+    await t.call('Page.addScriptToEvaluateOnNewDocument', { source: FAKE_WALLET });
+    await t.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    const evT = (expr) => evalIn(t.call, expr);
+    const waitT = (expr, ms = 6000) => waitFor(expr, ms, t.call);
+    const go = async (p) => {
+      await markLeaving(t.call);
+      await t.call('Page.navigate', { url: CF + p });
+      await waitFor(ready, 20000, t.call);
+      await settle(t.call);
+    };
+    const clickT = (expr) => click(expr, 0, t.call);
+    const text = () => evT(`return $('main').textContent`);
+    const otpRequests = () => mock.requests.filter((r) => r.path === '/auth/v1/otp').length;
+
+    await go('/clubs/clubfund');
+    await evT(`localStorage.clear(); sessionStorage.clear(); return true`);
+    await go('/clubs/clubfund');
+    let tx = await text();
+    check(A, 'signed out: verify step, SSO disclaimer, privacy statement', tx.includes('Verify your UMass email') && tx.includes('not UMass single sign-on') && tx.includes('It is not published on the blockchain.'));
+
+    // Email validation happens before any request; the server-side hook enforces the same rule.
+    for (const bad of ['eve@gmail.com', 'eve@umass.edu.attacker.com', 'eve@cs.umass.edu']) {
+      await evT(`typeInto($('[data-testid=cf-email]'), ${JSON.stringify(bad)}); return true`);
+      await clickT(`byText('main button', 'Send verification code')`);
+    }
+    check(A, 'non-UMass, look-alike and subdomain emails refused before sending', (await evT(`return $('main [role=alert]')?.textContent.includes('@umass.edu') && $('[data-testid=cf-email]').getAttribute('aria-invalid') === 'true'`)) && otpRequests() === 0);
+
+    mock.otp = 429;
+    await evT(`typeInto($('[data-testid=cf-email]'), ' JDoe@UMass.edu '); return true`);
+    await clickT(`byText('main button', 'Send verification code')`);
+    check(A, 'rate-limited code request: clear message', await waitT(`$('main [role=alert]')?.textContent.includes('Too many codes requested')`));
+    mock.otp = 'fail';
+    await clickT(`byText('main button', 'Send verification code')`);
+    check(A, 'auth service unreachable: clear message', await waitT(`$('main [role=alert]')?.textContent.includes("Can't reach the verification service")`));
+    mock.otp = 200;
+    await clickT(`byText('main button', 'Send verification code')`);
+    await waitT(`$('[data-testid=cf-code]')`);
+    const sent = mock.requests.filter((r) => r.path === '/auth/v1/otp').at(-1);
+    check(A, 'code requested for the normalized address', sent?.body?.email === 'jdoe@umass.edu' && (await evT(`return $('main').textContent.includes('We sent a 6-digit code to jdoe@umass.edu')`)));
+    check(A, 'resend waits with a visible countdown', await evT(`const b = $('[data-testid=cf-resend]'); return b.disabled && /Resend code in \\d+ s/.test(b.textContent)`));
+    check(A, 'code input: labelled, numeric, one-time-code autofill', await evT(`const i = $('[data-testid=cf-code]'); return i.closest('label').textContent.includes('6-digit code') && i.inputMode === 'numeric' && i.autocomplete === 'one-time-code'`));
+    await evT(`typeInto($('[data-testid=cf-code]'), '000000'); return true`);
+    await clickT(`byText('main form button[type=submit]', 'Verify')`);
+    check(A, 'wrong or expired code: announced error, no session', (await waitT(`$('main [role=alert]')?.textContent.includes('wrong or has expired')`)) && !(await evT(`return !!localStorage.getItem('myclubs-clubfund-auth')`)));
+    await evT(`typeInto($('[data-testid=cf-code]'), '123456'); return true`);
+    await clickT(`byText('main form button[type=submit]', 'Verify')`);
+    check(A, 'correct code: session and wallet step', await waitT(`$('main').textContent.includes('UMass email verified: jdoe@umass.edu') && $('main').textContent.includes('Connect your Solana wallet')`));
+    await go('/clubs/clubfund');
+    check(A, 'session restored after refresh', await waitT(`$('main').textContent.includes('UMass email verified: jdoe@umass.edu')`));
+
+    // Wallet: rejection, connection, signature rejection, then a server-confirmed link.
+    await evT(`localStorage.setItem('test:reject', 'connect'); return true`);
+    await clickT(`byText('main button', 'Connect Test Wallet')`);
+    check(A, 'wallet connection rejected: clear message', await waitT(`$('main [role=alert]')?.textContent.includes('You cancelled the connection')`));
+    await evT(`localStorage.removeItem('test:reject'); return true`);
+    await clickT(`byText('main button', 'Connect Test Wallet')`);
+    check(A, 'wallet connected: provider, short address, not linked yet', await waitT(`$('[data-testid=cf-connected]')?.textContent.includes('Test Wallet') && $('[data-testid=cf-connected]').textContent.includes('GmaD…AEGB') && $('[data-testid=cf-connected]').textContent.includes('not linked yet')`));
+    await evT(`localStorage.setItem('test:reject', 'sign'); return true`);
+    await clickT(`byText('main button', 'Sign verification message')`);
+    check(A, 'signature rejected: nothing linked', (await waitT(`$('main [role=alert]')?.textContent.includes('You cancelled the signature')`)) && mock.linked === null && !(await evT(`return $('main').textContent.includes('Wallet linked')`)));
+    await evT(`localStorage.removeItem('test:reject'); return true`);
+    mock.failLink = 'wallet_in_use';
+    await clickT(`byText('main button', 'Sign verification message')`);
+    check(A, 'server refuses (wallet linked elsewhere): message shown, no success', (await waitT(`$('main [role=alert]')?.textContent.includes('already linked to another')`)) && !(await evT(`return $('main').textContent.includes('Wallet linked')`)));
+    mock.failLink = null;
+    await clickT(`byText('main button', 'Sign verification message')`);
+    check(A, 'linked only after server confirmation', await waitT(`$('main').textContent.includes('Wallet linked') && $('main').textContent.includes('Verified by wallet signature')`));
+    const signed = await evT(`return window.__signed`);
+    check(A, 'wallet signed exactly the server challenge (no email inside)', signed === mock.challenge.message && !signed.includes('@'));
+    check(A, 'link calls carry the session token, not a user id', mock.requests.filter((r) => r.path.startsWith('/functions/')).every((r) => /^Bearer /.test(r.auth ?? '') && !('userId' in (r.body ?? {})) && !('email' in (r.body ?? {}))));
+    tx = await text();
+    check(A, 'ClubFund landing: three upcoming Devnet categories, no real money', ['Support a Club', 'Fund an Event', 'Charity Campaigns'].every((c) => tx.includes(c)) && tx.includes('test tokens that have no monetary value') && tx.includes('does not collect real money'));
+    await go('/clubs/clubfund');
+    check(A, 'verified link still shown after refresh', await waitT(`$('main').textContent.includes('Wallet linked')`));
+
+    // Wallet settings: disconnect is not unlink; unlink needs the wallet's signature.
+    await go('/clubs/clubfund/settings');
+    tx = await text();
+    check(A, 'settings after refresh: email, linked wallet, wallet reconnected silently', tx.includes('UMass email verified: jdoe@umass.edu') && tx.includes(ADDRESS) && (await waitT(`$('main').textContent.includes('Test Wallet connected')`)));
+    await clickT(`byText('main button', 'Disconnect wallet')`);
+    check(A, 'disconnect keeps the verified link', (await waitT(`!!byText('main button', 'Connect Test Wallet')`)) && mock.linked !== null && mock.unlink.length === 0 && (await evT(`return $('main').textContent.includes(${JSON.stringify(ADDRESS)})`)));
+    check(A, 'unlink needs the linked wallet (or a fresh email code)', await evT(`return !byText('main button', 'Sign and unlink') && !!byText('main button', 'Lost access to this wallet?')`));
+    await clickT(`byText('main button', 'Connect Test Wallet')`);
+    await waitT(`!!byText('main button', 'Sign and unlink')`);
+    await clickT(`byText('main button', 'Sign and unlink')`);
+    check(A, 'unlink with signature removes the link', (await waitT(`$('main').textContent.includes('No wallet linked')`)) && mock.unlink.at(-1)?.method === 'signature' && mock.linked === null);
+
+    // Accessibility and mobile.
+    await t.call('Accessibility.enable');
+    const { result } = await t.call('Accessibility.getFullAXTree');
+    const unnamed = result.nodes.filter((x) => !x.ignored && ['button', 'link', 'textbox', 'combobox'].includes(x.role?.value) && !(x.name?.value ?? '').trim());
+    check(A, 'settings page: every control has an accessible name', unnamed.length === 0, unnamed.map((x) => x.role.value).join(','));
+    await t.call('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
+    for (const p of ['/clubs/clubfund', '/clubs/clubfund/settings']) {
+      await go(p);
+      check(A, `no horizontal scroll at 375px: ${p}`, await evT(`return document.documentElement.scrollWidth <= 375`));
+    }
+    await t.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+
+    // No wallet installed; sign-out clears the local session.
+    await evT(`localStorage.setItem('test:noWallet', '1'); return true`);
+    await go('/clubs/clubfund');
+    check(A, 'no wallet installed: how to get one, never asks for a recovery phrase', await waitT(`$('main').textContent.includes('No Solana wallet found') && $('main').textContent.includes('never ask for your recovery phrase')`));
+    await go('/clubs/clubfund/settings');
+    await clickT(`byText('main button', 'Sign out')`);
+    check(A, 'sign out clears the local session', (await waitT(`$('main').textContent.includes('Verify your UMass email')`)) && !(await evT(`return !!localStorage.getItem('myclubs-clubfund-auth')`)));
+    await evT(`localStorage.clear(); return true`);
+    t.sock.close();
+    await fetch(`http://127.0.0.1:${PORT}/json/close/${tab.id}`).catch(() => {});
+  } finally {
+    server.kill();
+  }
 });
 
 // 11. Overflow / responsive

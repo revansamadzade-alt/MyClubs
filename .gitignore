@@ -13,3 +13,8 @@ tests/e2e/output
 *.tsbuildinfo
 tests/e2e/*.tmp.mjs
 tests/*.tmp.mjs
+
+# Environment files: only the placeholder example is tracked (no secrets in git)
+.env
+.env.*
+!.env.example

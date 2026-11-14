@@ -49,6 +49,10 @@ calendar that flags real time conflicts.
   If the browser can't store files, the résumé is kept for that visit only and the page says so. Finishing shows
   *Demo application prepared — not submitted to the organization.* (demo) or *Answers prepared — not submitted to the
   organization.* (real clubs).
+- **ClubFund (setup required)** — verify a @umass.edu inbox with a Supabase email code, then link one Solana wallet by
+  signing a single-use challenge that Edge Functions verify (Ed25519) before storing the link behind Row Level
+  Security. Devnet campaign categories are shown as upcoming; no money moves. Optional: the rest of MyClubs never needs
+  an account. Setup, security model and status: [docs/CLUBFUND.md](docs/CLUBFUND.md).
 - **Canvas-style shell** — dashboard, global navigation and To Do panel matched to the real Canvas layout.
 
 ## How MyClubs differs from Campus Pulse
@@ -90,8 +94,8 @@ The demo semester (Sep 2 – Dec 10, 2026) bounds weekly classes and club meetin
 ## Tests
 
 ```bash
-npm test           # 38 logic + feed tests: overlaps, deadlines, applications, migration, exports, feed parsing, snapshot integrity
-npm run test:e2e   # browser suite (366 checks); needs a running app and Google Chrome
+npm test           # 62 tests: logic, feeds, ClubFund Edge Function handlers (real Ed25519) and SQL/RLS on PGlite Postgres
+npm run test:e2e   # browser suite (397 checks); needs a running app and Google Chrome
 MYCLUBS_BASE_URL=http://localhost:4173 npm run test:e2e   # same suite against `npm run preview` (production build)
 ```
 

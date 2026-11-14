@@ -1,0 +1,17 @@
+{
+  "//": "Type-checks the runtime-independent Edge Function code with the project's TypeScript. runtime.ts and the index.ts entry points use Deno APIs and npm: specifiers; check them with `deno check` (Supabase also bundles them on deploy).",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "files": ["_shared/policy.ts", "_shared/handlers.ts"]
+}

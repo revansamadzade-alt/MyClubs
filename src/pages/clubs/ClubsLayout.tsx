@@ -15,6 +15,7 @@ const SECTIONS = [
   { to: '/clubs/applications', label: 'Applications', count: 'applications' as const },
   { to: '/clubs/events', label: 'Campus Events', count: 'saved' as const },
   { to: '/clubs/campus-life', label: 'My Campus Life' },
+  { to: '/clubs/clubfund', label: 'ClubFund' },
 ];
 
 function crumbsFor(pathname: string): { label: string; to?: string }[] {
@@ -32,7 +33,9 @@ function crumbsFor(pathname: string): { label: string; to?: string }[] {
             ? id === 'profile'
               ? 'My applicant profile'
               : orgFor(id)?.name
-            : undefined;
+            : section === 'clubfund' && id === 'settings'
+              ? 'Wallet settings'
+              : undefined;
     crumbs.push({ label: name ?? 'Not found', to: sub ? `/clubs/${section}/${id}` : undefined });
     if (sub === 'apply') crumbs.push({ label: 'Apply' });
   }
