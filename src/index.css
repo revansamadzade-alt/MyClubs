@@ -14,7 +14,7 @@
   --color-link: #053a7f;
   --color-link-dark: #032c61;
   --color-badge: #9e1b20;
-  --color-success: #0b874b;
+  --color-success: #0a7a44;
   --color-warn: #a84400;
   --color-warn-soft: #fff4e5;
 }
@@ -39,6 +39,17 @@ body {
 .on-dark :focus-visible {
   outline-color: #fff;
   outline-offset: -3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer components {

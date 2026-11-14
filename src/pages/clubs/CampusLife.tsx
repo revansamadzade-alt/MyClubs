@@ -232,7 +232,7 @@ function ItemDialog({ item, pool, onClose }: { item: ScheduleItem | null; pool: 
       ref={ref}
       onClose={onClose}
       onClick={(e) => e.target === ref.current && ref.current?.close()}
-      aria-labelledby="item-dialog-title"
+      aria-labelledby={item ? 'item-dialog-title' : undefined}
       className="m-auto w-[calc(100%-2rem)] max-w-lg rounded border border-line bg-white p-0 text-ink shadow-xl backdrop:bg-black/40"
     >
       {item && meta && Icon && (

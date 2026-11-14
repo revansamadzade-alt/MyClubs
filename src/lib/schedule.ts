@@ -47,10 +47,10 @@ export interface Overlap {
 }
 
 export const KIND_META: Record<ScheduleKind, { label: string; plural: string; color: string; soft: string; dashed?: boolean }> = {
-  academic: { label: 'Academic', plural: 'Academic items', color: '#0374b5', soft: '#e8f3fa' },
+  academic: { label: 'Academic', plural: 'Academic items', color: '#036aa6', soft: '#e8f3fa' },
   meeting: { label: 'Club meeting', plural: 'Club meetings', color: '#881c1c', soft: '#f8ecec' },
-  event: { label: 'Saved event', plural: 'Saved events', color: '#0b874b', soft: '#e8f5ee' },
-  clubEvent: { label: 'Club event (not saved)', plural: 'Club events', color: '#0b874b', soft: '#ffffff', dashed: true },
+  event: { label: 'Saved event', plural: 'Saved events', color: '#0a7a44', soft: '#e8f5ee' },
+  clubEvent: { label: 'Club event (not saved)', plural: 'Club events', color: '#0a7a44', soft: '#ffffff', dashed: true },
   application: { label: 'Application date', plural: 'Application dates', color: '#5a3a8a', soft: '#f1ecf7' },
 };
 

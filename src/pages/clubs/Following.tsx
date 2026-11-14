@@ -112,7 +112,7 @@ export default function Following() {
                   <li key={item.id} className="flex gap-3 rounded border border-line p-3">
                     <span
                       className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
-                      style={{ background: event ? '#e8f5ee' : '#f8ecec', color: event ? '#0b874b' : '#881c1c' }}
+                      style={{ background: event ? '#e8f5ee' : '#f8ecec', color: event ? '#0a7a44' : '#881c1c' }}
                     >
                       {event ? <Ticket size={16} aria-label="Event" /> : <UsersRound size={16} aria-label="Meeting" />}
                     </span>

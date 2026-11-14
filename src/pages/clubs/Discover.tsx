@@ -116,6 +116,7 @@ export default function Discover() {
         Showing {results.length} of {CLUBS.length} organizations · You follow {followed.length}
       </p>
 
+      <h2 className="sr-only">Organizations</h2>
       {results.length ? (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {results.map((c) => (

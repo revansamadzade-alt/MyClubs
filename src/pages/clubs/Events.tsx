@@ -131,6 +131,7 @@ export default function Events() {
         {results.length} event{results.length === 1 ? '' : 's'}
       </p>
 
+      <h2 className="sr-only">Events</h2>
       {results.length ? (
         <>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">

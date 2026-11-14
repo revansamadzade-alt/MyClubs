@@ -12,7 +12,7 @@ import { addDays, fmtDate, fmtRange, startOfDay } from '../../lib/dates';
 import { CategoryTag, ClubAvatar, FollowButton, PageHeader, SampleBadge } from '../../components/ui';
 
 const GROUPS: { status: Exclude<FitStatus, 'unknown'>; title: string; blurb: string; icon: LucideIcon; color: string }[] = [
-  { status: 'fits', title: 'Fits your schedule', blurb: `Every listed time in the next ${FIT_WINDOW_DAYS} days is free.`, icon: CalendarCheck2, color: '#0b874b' },
+  { status: 'fits', title: 'Fits your schedule', blurb: `Every listed time in the next ${FIT_WINDOW_DAYS} days is free.`, icon: CalendarCheck2, color: '#0a7a44' },
   { status: 'partial', title: 'Partial fit', blurb: 'Some listed times overlap your schedule. Each overlap is shown below.', icon: TriangleAlert, color: '#a84400' },
   { status: 'conflicts', title: 'Conflicts with your schedule', blurb: 'Every listed time overlaps something already on your calendar.', icon: CalendarX2, color: '#b3121d' },
 ];

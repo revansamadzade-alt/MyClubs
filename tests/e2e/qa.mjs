@@ -1370,6 +1370,110 @@ await section('23 Application features', async () => {
   await ev(`localStorage.clear(); return true`);
 });
 
+// 24. Accessibility: automated audit (names, ids/ARIA refs, headings, contrast, images) + keyboard, focus, dialogs, motion
+await section('24 Accessibility', async () => {
+  const A = 'U A11y';
+  await viewport(1440);
+  await goto('/');
+  await ev(`localStorage.clear(); return true`);
+  const AUDIT = `
+    const issues = [];
+    const ids = new Map();
+    for (const el of document.querySelectorAll('[id]')) ids.set(el.id, (ids.get(el.id) ?? 0) + 1);
+    for (const [id, n] of ids) if (n > 1) issues.push('duplicate id #' + id);
+    for (const el of document.querySelectorAll('[aria-labelledby], [aria-describedby], [aria-controls]'))
+      for (const attr of ['aria-labelledby', 'aria-describedby', 'aria-controls'])
+        for (const ref of (el.getAttribute(attr) ?? '').split(/\\s+/).filter(Boolean)) if (!document.getElementById(ref)) issues.push(attr + ' -> missing #' + ref);
+    const hs = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')].filter((h) => h.getClientRects().length || h.classList.contains('sr-only'));
+    if (hs.filter((h) => h.tagName === 'H1').length !== 1) issues.push('h1 count ' + hs.filter((h) => h.tagName === 'H1').length);
+    let prev = 0;
+    for (const h of hs) { const lvl = +h.tagName[1]; if (prev && lvl > prev + 1) issues.push('heading skip h' + prev + '->h' + lvl + ' ' + h.textContent.trim().slice(0, 30)); prev = lvl; }
+    for (const img of document.querySelectorAll('img')) if (!img.hasAttribute('alt')) issues.push('img without alt');
+    for (const svg of document.querySelectorAll('svg')) if (!svg.closest('[aria-hidden=true]') && !svg.getAttribute('aria-label') && !svg.querySelector('title')) issues.push('unlabelled svg');
+    const lum = (c) => { const [r, g, b] = c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const parse = (s) => { const m = s.match(/rgba?\\(([^)]+)\\)/); if (!m) return null; const p = m[1].split(/[ ,\\/]+/).filter(Boolean).map(Number); return { rgb: p.slice(0, 3), a: p.length > 3 ? p[3] : 1 }; };
+    const bgOf = (el) => { let rgb = [255, 255, 255]; const stack = []; for (let e = el; e; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.backgroundImage !== 'none' && !cs.backgroundImage.includes('gradient')) return null; const c = parse(cs.backgroundColor); if (c && c.a > 0) { stack.push(c); if (c.a >= 1) break; } } for (const c of stack.reverse()) rgb = rgb.map((v, i) => Math.round(c.rgb[i] * c.a + v * (1 - c.a))); return rgb; };
+    const seen = new Set();
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let n; let checked = 0;
+    while ((n = walker.nextNode())) {
+      const el = n.parentElement; if (!el || !n.textContent.trim() || seen.has(el)) continue; seen.add(el);
+      const r = el.getBoundingClientRect(); if (!r.width || !r.height) continue;
+      const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || el.closest('[aria-hidden=true], .sr-only, [hidden], dialog:not([open])')) continue;
+      let op = 1; for (let e = el; e; e = e.parentElement) op *= +getComputedStyle(e).opacity; if (op < 1) continue;
+      const fg = parse(cs.color); const bg = bgOf(el); if (!fg || !bg) continue;
+      const f = fg.rgb.map((v, i) => Math.round(v * fg.a + bg[i] * (1 - fg.a)));
+      const L1 = lum(f), L2 = lum(bg); const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+      const size = parseFloat(cs.fontSize); const large = size >= 24 || (+cs.fontWeight >= 700 && size >= 18.66);
+      checked++;
+      if (ratio < (large ? 3 : 4.5)) issues.push('contrast ' + ratio.toFixed(2) + ' "' + n.textContent.trim().slice(0, 30) + '"');
+    }
+    return { checked, issues: [...new Set(issues)] };`;
+  const unnamed = async () => {
+    await send('Accessibility.enable');
+    const { result } = await send('Accessibility.getFullAXTree');
+    const roles = ['button', 'link', 'textbox', 'combobox', 'checkbox', 'radio', 'listbox', 'menuitem', 'tab', 'switch', 'searchbox', 'spinbutton'];
+    return result.nodes.filter((x) => !x.ignored && roles.includes(x.role?.value) && !(x.name?.value ?? '').trim()).map((x) => x.role.value);
+  };
+  const audit = async (label) => {
+    const r = await ev(AUDIT);
+    const u = await unnamed();
+    check(A, `audit clean: ${label} (${r.checked} text nodes)`, r.checked > 10 && r.issues.length === 0 && u.length === 0, [...r.issues, ...u.map((x) => 'unnamed ' + x)].slice(0, 6).join(' | '));
+  };
+
+  await goto('/clubs/discover/comedyleague');
+  await click(`byText('main article > header button', 'Apply')`);
+  for (const p of ['/', '/clubs/discover', '/clubs/discover/comedyleague', '/clubs/fit', '/clubs/following', '/clubs/events', '/clubs/campus-life', '/clubs/applications', '/clubs/applications/profile', '/clubs/applications/comedyleague', '/clubs/applications/demo-org/apply', '/clubs/applications/demo-org/apply?view=review']) {
+    await goto(p);
+    await audit(p);
+  }
+
+  // Validation errors: announced, linked to their fields, focus moves to the first problem.
+  await goto('/clubs/applications/demo-org/apply');
+  await click(`byText('main button', 'Next')`);
+  check(A, 'errors: summary is an alert, focus on first invalid field, fields linked to messages', await ev(`const f = $('#f-fullName'); return !!$('main [role=alert]') && document.activeElement === f && f.getAttribute('aria-invalid') === 'true' && f.getAttribute('aria-describedby').includes('f-fullName-error')`));
+  await audit('apply form with validation errors');
+
+  // Keyboard: Tab order follows the form and every stop shows a focus indicator.
+  await goto('/clubs/applications/demo-org/apply');
+  await ev(`$('#f-fullName').focus(); return true`);
+  const order = [];
+  for (let i = 0; i < 7; i++) {
+    order.push(await ev(`const e = document.activeElement; const cs = getComputedStyle(e); return (e.id || e.textContent.trim().slice(0, 12)) + (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 ? '' : ' [no outline]')`));
+    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+  }
+  check(A, 'keyboard: Tab order follows the form, focus always visible', JSON.stringify(order.slice(1)) === JSON.stringify(['f-email', 'f-major', 'f-classYear', 'f-minor', 'Save draft', 'Next']), order.join(' > '));
+
+  // Dialog: focus moves in, Escape closes, focus returns to the item that opened it.
+  await goto('/clubs/campus-life');
+  await click(`byText('main [aria-label="Calendar view"] button', 'Agenda')`);
+  await ev(`const b = $$('main section[aria-labelledby^="day-"] li button')[0]; b.focus(); b.click(); return true`);
+  await waitFor(`$('dialog[open]')`);
+  check(A, 'dialog: focus moves inside and it is labelled', await ev(`const d = $('dialog[open]'); return d.contains(document.activeElement) && !!document.getElementById(d.getAttribute('aria-labelledby'))`));
+  await audit('calendar with details dialog open');
+  await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await waitFor(`!$('dialog[open]')`);
+  check(A, 'dialog: Escape closes and focus returns to the opener', await ev(`return !$('dialog[open]') && document.activeElement?.closest('section[aria-labelledby^="day-"]') !== null`));
+
+  // Reduced motion is respected.
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  await goto('/clubs/discover');
+  check(A, 'prefers-reduced-motion turns transitions off', await ev(`return parseFloat(getComputedStyle($('main .btn')).transitionDuration) < 0.001`));
+  await send('Emulation.setEmulatedMedia', { features: [] });
+
+  // Mobile layout and drawer.
+  await viewport(375, 812);
+  for (const p of ['/clubs/discover', '/clubs/applications/demo-org/apply']) {
+    await goto(p);
+    await audit(`375px ${p}`);
+  }
+  await viewport(1440);
+  await goto('/');
+  await ev(`localStorage.clear(); return true`);
+});
+
 // 11. Overflow / responsive
 const overflow = [];
 await section('11 Responsive', async () => {
