@@ -8,3 +8,8 @@ tests/e2e/output
 # Machine-specific local config (kept on disk, not tracked)
 .mcp.json
 .claude/settings.local.json
+
+# TypeScript incremental build cache and temporary test runners
+*.tsbuildinfo
+tests/e2e/*.tmp.mjs
+tests/*.tmp.mjs

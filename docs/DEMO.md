@@ -36,6 +36,9 @@
   (Dec 10, 2026); change `VITE_SEMESTER_START` / `VITE_SEMESTER_END` if judging falls outside it.
 - **Laptop failure:** walk through `docs/screenshots/` (dashboard → discover → find my fit → profile → calendar →
   conflict details) in that order using the same script.
+- **Optional profile + calendar add-on (+30 s):** Applications → **Create profile** → fill name and an `@umass.edu`
+  email → **Save profile**. Open Best Buddies' **Apply**: step 1 is prefilled. On Comedy League's application page add an
+  **Audition** date under *Your dates*; it appears in My Campus Life and in the Dashboard To Do as a MyClubs task.
 - **Optional Applications segment (+60 s):** Discover → **Application required** chip. Point out Comedy League's
   quoted audition requirement, then scroll to **Campus Builders Collective (demo)** and click **Apply**. Fill step 1
   (any name, an `@umass.edu` email), click **Use sample résumé (demo)** on step 2 and add `github.com/your-name`,

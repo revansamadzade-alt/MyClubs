@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      # Browser tests run against the production build (no secrets or external services needed;
+      # the committed data snapshot is used, and the page clock is fixed by the test harness).
+      - name: Browser tests (production preview)
+        run: |
+          npx vite preview --port 4173 --strictPort &
+          for i in $(seq 1 30); do curl -sf http://localhost:4173 > /dev/null && break; sleep 1; done
+          npm run test:e2e
+        env:
+          MYCLUBS_BASE_URL: http://localhost:4173
+
+      - name: Upload browser test screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-output
+          path: tests/e2e/output
+          if-no-files-found: ignore

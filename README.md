@@ -26,18 +26,29 @@ calendar that flags real time conflicts.
 - **My Clubs & Associations** — follow/unfollow (tracking only, not membership), upcoming activity, persistence in `localStorage`
   that stays in sync across open tabs.
 - **Applications** — a personal tracker for organizations you want to join: status (Interested → Draft in progress →
-  Prepared (demo) → Submitted externally → Decision received; the last two are self-reported), progress steps, the link
-  you used, your own reminder date and notes. Discover can filter by membership process. **Apply** sits next to Follow
-  on cards and profiles, only where an application is verified as required (or on the clearly labeled demo
-  organization). It saves the organization to Applications (never twice) and opens its application form. *Applications
-  closed* appears only after a verified official deadline.
+  Answers prepared — not submitted → Submitted externally → Decision received; the last two are self-reported, and
+  decisions use a fixed outcome: Pending, Accepted, Waitlisted, Not accepted, Withdrawn or Other, plus a note), progress
+  steps, the link you used, notes, and your own dates (reminders, interviews, auditions). Discover can filter by
+  membership process. **Apply** sits next to Follow on cards and profiles, only where an application is verified as
+  required (or on the clearly labeled demo organization); it saves the organization once and opens its form. When a
+  verified deadline has passed it becomes *Save — applications closed*, so you can still track it.
+- **My applicant profile** — optional, browser-only details (name, UMass email, major, links, experience) and a
+  default résumé that prefill new application forms. Saved answers are never overwritten; *Fill empty fields from my
+  profile* only fills blanks. Deletable at any time.
+- **Application dates everywhere** — your reminders, interviews and auditions (and verified official deadlines, when a
+  club publishes one) appear in My Campus Life (month, week, agenda; never counted as conflicts) and as MyClubs tasks in
+  the Dashboard To Do, next to the demo course work.
 - **Application forms** — a 4-step form (personal information → résumé & links → organization questions → review),
   with draft autosave, required/optional labels, character counters, friendly validation (UMass email, GitHub/LinkedIn
   profile links, PDF checks) and copy/download of your answers. Questions adapt to the organization's field through
-  reusable templates: technology & engineering, business, arts & creative, media, service, sports and general.
-  These are *sample application questions*; an organization's verified official requirement is shown separately.
-  Résumés (PDF, up to 5 MB) stay in this browser's IndexedDB and are never uploaded. Finishing shows *Demo application
-  prepared — not submitted to the organization.*
+  reusable templates: technology & engineering, business, arts & creative, audition-based performance (Comedy
+  League), media, service, sports and general. These are *sample application questions*; an organization's verified
+  official requirement is shown separately. Résumés (PDF, up to 5 MB) stay in this browser's IndexedDB and are never
+  uploaded; a saved default résumé is reused by reference. Answers autosave and survive an immediate refresh; if the
+  same application is edited in two tabs, the older tab never overwrites newer answers and asks which version to keep.
+  If the browser can't store files, the résumé is kept for that visit only and the page says so. Finishing shows
+  *Demo application prepared — not submitted to the organization.* (demo) or *Answers prepared — not submitted to the
+  organization.* (real clubs).
 - **Canvas-style shell** — dashboard, global navigation and To Do panel matched to the real Canvas layout.
 
 ## How MyClubs differs from Campus Pulse
@@ -69,6 +80,8 @@ npm run build     # typecheck + production build
 npm run preview   # serve the production build (offline backup)
 ```
 
+Deployment (Vercel) and the release checklist: [docs/DEPLOY.md](docs/DEPLOY.md).
+
 Use **Reset demo** in the MyClubs header to restore the demo state. Judge walkthrough: [docs/DEMO.md](docs/DEMO.md).
 
 The demo semester (Sep 2 – Dec 10, 2026) bounds weekly classes and club meetings; override it with
@@ -77,9 +90,16 @@ The demo semester (Sep 2 – Dec 10, 2026) bounds weekly classes and club meetin
 ## Tests
 
 ```bash
-npm test           # logic + feed tests: overlaps, deadlines, duplicates, semester bounds, feed parsing, snapshot integrity
-npm run test:e2e   # browser suite (278 checks); needs `npm run dev` running and Google Chrome installed
+npm test           # 38 logic + feed tests: overlaps, deadlines, applications, migration, exports, feed parsing, snapshot integrity
+npm run test:e2e   # browser suite (366 checks); needs a running app and Google Chrome
+MYCLUBS_BASE_URL=http://localhost:4173 npm run test:e2e   # same suite against `npm run preview` (production build)
 ```
+
+The browser suite covers two-tab conflicts, refresh right after typing, résumé viewing and storage failures, the
+actual clipboard and `.txt` contents, and an automated accessibility audit (accessible names, ARIA references,
+headings, WCAG contrast, keyboard order, focus, dialogs, reduced motion). Screen-reader testing has not been done.
+GitHub Actions (`.github/workflows/ci.yml`) runs typecheck, unit tests, build and the browser suite on the
+production build.
 
 Both suites use a fixed clock (default `2026-11-13T12:00:00`, America/New_York) so results never depend on today's
 date. Override with `MYCLUBS_TEST_NOW`, `MYCLUBS_TEST_TZ`, `MYCLUBS_BASE_URL` and `CHROME_PATH`.
@@ -100,7 +120,11 @@ Club and event data come from public feeds and are committed as a dated snapshot
 | Instagram / Facebook APIs | Need Meta app review and tokens | **Not used**; profile links only |
 
 - `npm run sync:data` refreshes the snapshot (about 2 seconds). Vercel runs it on every deploy (`npm run build:fresh`).
-  A source that fails keeps its previous data, and the UI shows each source's last successful update.
+  A source that fails keeps its previous data, and the UI shows each source's last successful update; if the sync
+  fails outright, the deploy builds with the committed snapshot.
+- `npm run check:membership` re-checks every verified membership statement against its public page: confirmed
+  statements get a `lastChecked` date; a changed statement is flagged for a person to review and is never rewritten
+  automatically. It also prints membership wording on unverified clubs as leads (not applied).
 - Nothing is fetched at runtime (the feeds don't allow cross-origin requests), so the app never claims to be live.
 - 28 curated organizations have full public profiles; 50 more are *event hosts* from the events feed, shown with
   their official name, verified events and a Campus Pulse link — no description, contacts or schedule are invented.
@@ -111,10 +135,12 @@ Club and event data come from public feeds and are committed as a dated snapshot
   other clubs are shown as *schedule unknown* in Find My Fit, with the reason.
 - No invented emails, member counts, reviews or events. Reviews are demo reviews written in your browser.
 - Following a club is not membership; saving an event is not an RSVP; tracking an application never submits anything.
-- Membership process is shown only when the official listing states it (quoted on the profile with its source):
-  Comedy League (auditions) and Best Buddies (membership application) require one; Chess Club, Outing Club and UMass
-  Gaming and Esports Club are open. No official deadlines or application links are published, so the app shows
-  *Deadline not listed*; every other club shows *Application process not listed*.
+- Membership process is shown only when the official listing states it (quoted on the profile with its source,
+  re-checked 2026-11-14): Comedy League (auditions) and Best Buddies (membership application) require one; Chess Club,
+  Outing Club, UMass Gaming and Esports Club, Isenberg Investment Club, Ultimate Frisbee - Women's and UMass Ski and
+  Board Club are open. No official deadlines, application links, questions or audition schedules are published, so the
+  app shows *Deadline not listed* / *Audition schedule not listed*; the other 70 clubs show *Application process not
+  listed*.
 - Courses, the weekly class schedule, deadlines and sample events are fictional demo data, generated relative to today.
 
 ## Project structure
@@ -123,8 +149,9 @@ Club and event data come from public feeds and are committed as a dated snapshot
 src/
   data/        clubs.ts + verifiedEvents.ts (Campus Pulse), courses.ts + events.ts (demo)
   lib/         dates, schedule builder + overlap detection, fit.ts (Find My Fit), applications.ts (statuses, demo org),
-               applicationForms.ts (form templates + validation), fileStore.ts (IndexedDB résumés)
-  context/     StoreContext (follows, saves, reviews, applications), ToastContext
+               applicationForms.ts (form templates + validation), applicationPlanner.ts (application dates → calendar
+               and To Do), fileStore.ts (IndexedDB résumés)
+  context/     StoreContext (follows, saves, reviews, applications, applicant profile), ToastContext
   components/  AppShell, GlobalNav, cards, reviews, shared UI
   pages/       Dashboard, placeholders, clubs/* (MyClubs pages)
 ```

@@ -37,7 +37,7 @@ const check = (area, name, pass, detail = '') => results.push({ area, name, pass
 
 const chrome = spawn(
   CHROME,
-  ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'myclubs-qa-'))}`, '--disable-gpu', '--no-first-run', '--no-default-browser-check', 'about:blank'],
+  ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'myclubs-qa-'))}`, '--disable-gpu', '--no-first-run', '--no-default-browser-check', ...(process.env.CI ? ['--no-sandbox'] : []), 'about:blank'],
   { stdio: 'ignore' },
 );
 
@@ -1090,9 +1090,10 @@ await section('22 Reliability', async () => {
   check(A, 'save indicator: Saving… while a change is pending', await ev(`return $('[data-testid=save-state]').textContent.includes('Saving')`));
   await waitFor(`$('[data-testid=save-state]').textContent.startsWith('Saved in this browser at')`, 3000);
   check(A, 'save indicator: Saved only after the write', await ev(`return $('[data-testid=save-state]').textContent.startsWith('Saved in this browser at') && ls('myclubs:applications')[0].form.values.fullName === 'Alex Minuteman'`));
-  await ev(`typeInto($('#f-minor'), 'Mathematics and Statistics'); return true`);
+  // Type and mark this document in one step, then refresh at once (well inside the autosave delay).
+  await ev(`typeInto($('#f-minor'), 'Mathematics and Statistics'); window.__leaving = true; return true`);
   await send('Page.reload', {});
-  await waitFor(`document.readyState === 'complete' && $('#f-minor')`, 5000);
+  await waitFor(`!window.__leaving && document.readyState === 'complete' && $('#f-minor')`, 8000);
   check(A, 'rapid typing then immediate refresh keeps the text', await ev(`return $('#f-minor').value === 'Mathematics and Statistics' && $('#f-fullName').value === 'Alex Minuteman'`));
   await ev(`typeInto($('#f-minor'), 'Mathematics'); return true`);
   await goto('/clubs/applications');
@@ -1172,7 +1173,7 @@ await section('22 Reliability', async () => {
     A,
     "IndexedDB failure: warns the file won't survive a refresh",
     memOnly && (await ev(`const t = $('[data-testid=resume-memory-only]').textContent; return t.includes("can't store files") && t.includes('gone after a refresh') && $('[data-testid=resume-attached]')?.textContent.includes('this visit only')`)),
-    memOnly ? '' : await ev(`return location.pathname + ' | ' + ($('#step-heading')?.textContent ?? '-') + ' | ' + [...$$('main [role=alert], main [role=status]')].map((e) => e.textContent).join(' / ').slice(0, 300)`),
+    memOnly ? await ev(`return 'alert: ' + $('[data-testid=resume-memory-only]').textContent.slice(0, 160) + ' | attached: ' + ($('[data-testid=resume-attached]')?.textContent ?? 'none').slice(0, 120)`) : await ev(`return location.pathname + ' | ' + ($('#step-heading')?.textContent ?? '-') + ' | ' + [...$$('main [role=alert], main [role=status]')].map((e) => e.textContent).join(' / ').slice(0, 300)`),
   );
   check(A, 'IndexedDB failure: no stored résumé is claimed', (await stored('demo-org'))?.form?.resume === undefined);
   await ev(`typeInto($('#f-portfolio'), 'alex.dev'); return true`);
