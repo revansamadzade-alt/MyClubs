@@ -1,0 +1,338 @@
+[
+ {
+  "id": "googledeveloperclub",
+  "category": "Technology",
+  "initials": "GD",
+  "color": "#1e4f8f",
+  "cover": "circuit",
+  "tags": [
+   "Academic Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "womenincybersecurity",
+  "category": "Technology",
+  "initials": "WC",
+  "color": "#5a3a8a",
+  "cover": "dots",
+  "tags": [
+   "Academic Council"
+  ],
+  "meetings": [],
+  "scheduleNote": "Meets weekly (day and time not listed)."
+ },
+ {
+  "id": "roboticsclub",
+  "category": "Engineering",
+  "initials": "RC",
+  "color": "#335c81",
+  "cover": "grid",
+  "tags": [
+   "Academic Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "engineerswithoutborders",
+  "category": "Engineering",
+  "initials": "EW",
+  "color": "#00756a",
+  "cover": "topo",
+  "tags": [
+   "Service & Engagement Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "3dprinting",
+  "category": "Engineering",
+  "initials": "3D",
+  "color": "#2b3a55",
+  "cover": "grid",
+  "tags": [
+   "Academic Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "isenberginvestmentclub",
+  "category": "Business",
+  "initials": "IC",
+  "color": "#1d4f91",
+  "cover": "waves",
+  "tags": [
+   "Academic Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "180consulting",
+  "category": "Business",
+  "initials": "18",
+  "color": "#127a7a",
+  "cover": "dots",
+  "tags": [
+   "Academic Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "umassaccountingassociation",
+  "category": "Business",
+  "initials": "AA",
+  "color": "#394b58",
+  "cover": "solid",
+  "tags": [
+   "Academic Council"
+  ],
+  "meetings": [
+   {
+    "dow": 3,
+    "start": "18:00",
+    "end": "19:00",
+    "label": "Weekly meeting"
+   }
+  ],
+  "scheduleNote": "Weekly meetings on Wednesdays, 6:00–7:00 PM in Isenberg 106 (as stated on Campus Pulse).",
+  "location": "Isenberg 106"
+ },
+ {
+  "id": "thevocalsuspects",
+  "category": "Arts & Music",
+  "initials": "VS",
+  "color": "#a3324a",
+  "cover": "waves",
+  "tags": [
+   "Arts & Media Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "umasstheatreguild",
+  "category": "Arts & Music",
+  "initials": "TG",
+  "color": "#7a3e9d",
+  "cover": "forest",
+  "tags": [
+   "Arts & Media Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "kpopdanceclub",
+  "category": "Arts & Music",
+  "initials": "KD",
+  "color": "#b8172b",
+  "cover": "waves",
+  "tags": [
+   "Arts & Media Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "umoc",
+  "category": "Sports & Recreation",
+  "initials": "OC",
+  "color": "#2f6f4f",
+  "cover": "topo",
+  "tags": [
+   "Recreation Council"
+  ],
+  "meetings": [],
+  "scheduleNote": "General meetings Mondays at 6:00 PM outside the gear locker, 472 North Pleasant Street. No end time is listed, so it is not added to your calendar.",
+  "location": "Outside the gear locker, 472 North Pleasant Street"
+ },
+ {
+  "id": "ladyzooultimate",
+  "category": "Sports & Recreation",
+  "initials": "WU",
+  "color": "#4b5d16",
+  "cover": "grid",
+  "tags": [
+   "Club Sport Council"
+  ],
+  "meetings": [],
+  "scheduleNote": "Practices during the fall and spring semesters (times not listed)."
+ },
+ {
+  "id": "chessclub",
+  "category": "Sports & Recreation",
+  "initials": "CC",
+  "color": "#6b5b2a",
+  "cover": "grid",
+  "tags": [
+   "Recreation Council"
+  ],
+  "meetings": [
+   {
+    "dow": 1,
+    "start": "18:00",
+    "end": "21:00",
+    "label": "Club meeting"
+   },
+   {
+    "dow": 4,
+    "start": "18:00",
+    "end": "21:00",
+    "label": "Club meeting"
+   }
+  ],
+  "scheduleNote": "Mondays and Thursdays, 6:00–9:00 PM at the Blue Wall (as stated on Campus Pulse).",
+  "location": "Blue Wall"
+ },
+ {
+  "id": "vietnamesestudentassociation",
+  "category": "Cultural",
+  "initials": "VA",
+  "color": "#995c00",
+  "cover": "topo",
+  "tags": [
+   "Cultural Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "koreanstudentsassociation",
+  "category": "Cultural",
+  "initials": "KS",
+  "color": "#0f6b8f",
+  "cover": "dots",
+  "tags": [
+   "Cultural Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "habitatforhumanity",
+  "category": "Service",
+  "initials": "HH",
+  "color": "#8a4b08",
+  "cover": "solid",
+  "tags": [
+   "Service & Engagement Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "bestbuddies",
+  "category": "Service",
+  "initials": "BB",
+  "color": "#a03c78",
+  "cover": "waves",
+  "tags": [
+   "Service & Engagement Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "wmuaradiostation",
+  "category": "Media",
+  "initials": "WM",
+  "color": "#881c1c",
+  "cover": "circuit",
+  "tags": [
+   "Student Agency"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "activeminds",
+  "category": "Wellness",
+  "initials": "AM",
+  "color": "#2f6f8f",
+  "cover": "waves",
+  "tags": [
+   "Advocacy Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "skiboardclub",
+  "category": "Sports & Recreation",
+  "initials": "SB",
+  "color": "#0f6b8f",
+  "cover": "topo",
+  "tags": [
+   "Recreation Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "circlekinternationalclub",
+  "category": "Service",
+  "initials": "CK",
+  "color": "#1d4f91",
+  "cover": "dots",
+  "tags": [
+   "Service & Engagement Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "esportsclub",
+  "category": "Gaming",
+  "initials": "GE",
+  "color": "#5c4db1",
+  "cover": "circuit",
+  "tags": [
+   "Recreation Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "formulaoneclub",
+  "category": "Sports & Recreation",
+  "initials": "F1",
+  "color": "#b5261e",
+  "cover": "grid",
+  "tags": [
+   "Recreation Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "isenbergsustainability",
+  "category": "Business",
+  "initials": "IS",
+  "color": "#2e7d4f",
+  "cover": "forest",
+  "tags": [
+   "Academic Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "muslimstudentsassociation",
+  "category": "Cultural",
+  "initials": "MS",
+  "color": "#127a7a",
+  "cover": "topo",
+  "tags": [
+   "Religious & Spiritual Council"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "universityprogrammingcouncil",
+  "category": "Arts & Music",
+  "initials": "UP",
+  "color": "#7b3f99",
+  "cover": "waves",
+  "tags": [
+   "Student Agency"
+  ],
+  "meetings": []
+ },
+ {
+  "id": "comedyleague",
+  "category": "Arts & Music",
+  "initials": "CL",
+  "color": "#995c00",
+  "cover": "dots",
+  "tags": [
+   "Arts & Media Council"
+  ],
+  "meetings": []
+ }
+]

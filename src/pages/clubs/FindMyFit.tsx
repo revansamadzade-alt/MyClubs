@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import { CalendarCheck2, CalendarX2, ExternalLink, Info, TriangleAlert } from 'lucide-react';
 import type { Category } from '../../types';
-import { CATEGORIES, CLUBS } from '../../data/clubs';
+import { CATEGORIES, CLUBS, campusPulseLinks } from '../../data/clubs';
 import { useStore } from '../../context/StoreContext';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useTitle } from '../../hooks/useTitle';
@@ -83,7 +83,7 @@ function FitCard({ fit, color }: { fit: ClubFit; color: string }) {
         <Link to={`/clubs/discover/${club.id}`} className="btn btn-secondary btn-sm">
           View profile
         </Link>
-        <a href={club.sourceUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+        <a href={campusPulseLinks(club).page} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
           <ExternalLink size={14} aria-hidden /> Official page
           <span className="sr-only"> for {club.name} on Campus Pulse (opens in a new tab)</span>
         </a>
@@ -216,14 +216,16 @@ export default function FindMyFit() {
                 <p className="mt-1 text-xs text-ink">{unknownReason(f)}</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <a href={f.club.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-link hover:underline">
+                <a href={campusPulseLinks(f.club).page} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-link hover:underline">
                   <ExternalLink size={14} aria-hidden /> Official page
                   <span className="sr-only"> for {f.club.name} on Campus Pulse (opens in a new tab)</span>
                 </a>
-                <a href={`${f.club.sourceUrl}/events`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-link hover:underline">
-                  <ExternalLink size={14} aria-hidden /> Events
-                  <span className="sr-only"> for {f.club.name} on Campus Pulse (opens in a new tab)</span>
-                </a>
+                {campusPulseLinks(f.club).events && (
+                  <a href={campusPulseLinks(f.club).events!} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-link hover:underline">
+                    <ExternalLink size={14} aria-hidden /> Events
+                    <span className="sr-only"> for {f.club.name} on Campus Pulse (opens in a new tab)</span>
+                  </a>
+                )}
                 <FollowButton club={f.club} size="sm" />
               </div>
             </li>

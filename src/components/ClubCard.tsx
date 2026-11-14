@@ -34,7 +34,8 @@ export function ClubCard({ club }: { club: Club }) {
         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
           <CategoryTag category={club.category} />
           <span className="inline-flex items-center gap-1" title={`From the official Campus Pulse listing, retrieved ${club.verifiedOn}`}>
-            <BadgeCheck size={13} aria-hidden className="text-success" /> Campus Pulse
+            <BadgeCheck size={13} aria-hidden className="text-success" />{' '}
+            {club.sourceKind === 'event-host' ? 'Event host · Campus Pulse' : 'Campus Pulse'}
           </span>
         </div>
         <p className="mt-2 line-clamp-2 text-sm text-ink-soft">{club.summary}</p>

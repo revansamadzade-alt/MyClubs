@@ -1,6 +1,6 @@
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft, BadgeCheck, CalendarClock, Clock, ExternalLink, Info, MapPin, SearchX } from 'lucide-react';
-import { CLUB_BY_ID } from '../../data/clubs';
+import { CLUB_BY_ID, campusPulseLinks } from '../../data/clubs';
 import { EVENTS } from '../../data/events';
 import { DOW_PLURAL, fmtDate, fmtTime, hhmmRange } from '../../lib/dates';
 import { nextMeeting } from '../../lib/schedule';
@@ -36,6 +36,8 @@ export default function ClubProfile() {
   const now = new Date();
   const events = EVENTS.filter((e) => e.clubId === club.id && e.end > now);
   const pastEvents = EVENTS.filter((e) => e.clubId === club.id && e.end <= now).reverse();
+  const isHost = club.sourceKind === 'event-host';
+  const cp = campusPulseLinks(club);
   const next = nextMeeting(club);
 
   return (
@@ -60,7 +62,8 @@ export default function ClubProfile() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-link hover:underline"
               >
-                <BadgeCheck size={15} aria-hidden className="text-success" /> Verified on Campus Pulse
+                <BadgeCheck size={15} aria-hidden className="text-success" />{' '}
+                {isHost ? 'Listed as an event host on Campus Pulse' : 'Verified on Campus Pulse'}
                 <span className="sr-only"> (opens in a new tab)</span>
               </a>
             </div>
@@ -98,8 +101,8 @@ export default function ClubProfile() {
             ) : (
               <p className="text-ink-soft">
                 No verified upcoming events yet. Check{' '}
-                <a href={`${club.sourceUrl}/events`} target="_blank" rel="noopener noreferrer" className="text-link hover:underline">
-                  this organization's Campus Pulse events
+                <a href={cp.events ?? cp.page} target="_blank" rel="noopener noreferrer" className="text-link hover:underline">
+                  this organization on Campus Pulse
                 </a>
                 .
               </p>
@@ -171,9 +174,9 @@ export default function ClubProfile() {
               <p className="italic text-ink-soft">No external links listed.</p>
             )}
             <p className="mt-3 text-ink-soft">
-              Contact this organization through its{' '}
-              <a href={club.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-link hover:underline">
-                Campus Pulse page
+              {isHost ? 'Find and contact this organization through ' : 'Contact this organization through its '}
+              <a href={cp.page} target="_blank" rel="noopener noreferrer" className="text-link hover:underline">
+                {isHost ? 'Campus Pulse' : 'Campus Pulse page'}
               </a>
               . Membership size is not listed.
             </p>

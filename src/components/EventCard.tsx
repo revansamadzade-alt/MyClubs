@@ -19,8 +19,8 @@ export function EventCard({ event, compact }: { event: CampusEvent; compact?: bo
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <CategoryTag category={event.category} />
             {event.verified ? (
-              <span className="inline-flex items-center gap-1 text-xs text-ink-soft" title={`Official Campus Pulse listing, retrieved ${event.verified.retrievedOn}`}>
-                <BadgeCheck size={13} aria-hidden className="text-success" /> Verified · Campus Pulse
+              <span className="inline-flex items-center gap-1 text-xs text-ink-soft" title={`Official ${event.verified.source ?? 'Campus Pulse'} listing, retrieved ${event.verified.retrievedOn}`}>
+                <BadgeCheck size={13} aria-hidden className="text-success" /> Verified · {event.verified.source ?? 'Campus Pulse'}
               </span>
             ) : (
               <SampleBadge label="Sample event" />

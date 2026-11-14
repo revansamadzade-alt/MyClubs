@@ -1,4 +1,8 @@
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { DataSources } from '../../components/DataSources';
+
+const PAGE_SIZE = 40;
 import { CalendarX2 } from 'lucide-react';
 import type { Category } from '../../types';
 import { CATEGORIES } from '../../data/clubs';
@@ -24,6 +28,7 @@ export default function Events() {
   const cat = (params.get('cat') ?? 'All') as Category | 'All';
   const when = (params.get('when') ?? 'any') as When;
   const src = (params.get('src') ?? 'all') as Source;
+  const [shown, setShown] = useState({ key: '', n: PAGE_SIZE });
 
   const update = (key: string, value: string, fallback: string) => {
     const next = new URLSearchParams(params);
@@ -44,6 +49,9 @@ export default function Events() {
 
   const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
   const limit = when === 'week' ? addDays(startOfDay(now), 7) : when === 'two-weeks' ? addDays(startOfDay(now), 14) : null;
+  // Render in pages so hundreds of real events stay fast; the page size resets whenever filters change.
+  const filterKey = params.toString();
+  const visible = shown.key === filterKey ? shown.n : PAGE_SIZE;
   const results = inView(view).filter((e) => {
     if (cat !== 'All' && e.category !== cat) return false;
     if (limit && e.start >= limit) return false;
@@ -65,8 +73,9 @@ export default function Events() {
     <>
       <PageHeader
         title="Campus Events"
-        description="Find things to do on campus. Verified events come from public Campus Pulse listings; sample events are demo data and not real UMass events. Saving adds an event to My Campus Life — it does not RSVP or register you."
+        description="Find things to do on campus. Verified events come from the public Campus Pulse and UMass Events Calendar feeds; sample events are demo data and not real UMass events. Saving adds an event to My Campus Life — it does not RSVP or register you."
       />
+      <DataSources ids={['campus-pulse-rss', 'umass-events-ics']} what="Verified events" />
 
       <div className="mb-4 flex gap-1 overflow-x-auto border-b border-line" role="group" aria-label="Event lists">
         {tabs.map((t) => (
@@ -123,11 +132,23 @@ export default function Events() {
       </p>
 
       {results.length ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {results.map((e) => (
-            <EventCard key={e.id} event={e} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {results.slice(0, visible).map((e) => (
+              <EventCard key={e.id} event={e} />
+            ))}
+          </div>
+          {results.length > visible && (
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <button type="button" onClick={() => setShown({ key: filterKey, n: visible + PAGE_SIZE })} className="btn btn-secondary">
+                Show {Math.min(PAGE_SIZE, results.length - visible)} more
+              </button>
+              <span className="text-sm text-ink-soft">
+                Showing {visible} of {results.length}. Search or filter to narrow down.
+              </span>
+            </div>
+          )}
+        </>
       ) : (
         <EmptyState
           icon={CalendarX2}

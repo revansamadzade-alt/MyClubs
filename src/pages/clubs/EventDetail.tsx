@@ -46,7 +46,7 @@ export default function EventDetail() {
             <CategoryTag category={event.category} />
             {event.verified ? (
               <span className="inline-flex items-center gap-1 text-sm text-ink-soft">
-                <BadgeCheck size={15} aria-hidden className="text-success" /> Verified on Campus Pulse
+                <BadgeCheck size={15} aria-hidden className="text-success" /> Verified on {event.verified.source ?? 'Campus Pulse'}
               </span>
             ) : (
               <SampleBadge label="Sample event" />
@@ -103,7 +103,7 @@ export default function EventDetail() {
               <Info size={18} aria-hidden className="mt-0.5 shrink-0 text-link" />
               <div>
                 <p>
-                  From the official Campus Pulse listing, retrieved{' '}
+                  From the official {event.verified.source ?? 'Campus Pulse'} listing, retrieved{' '}
                   {new Date(`${event.verified.retrievedOn}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.
                   Saving it here only adds it to My Campus Life; it does <strong>not</strong> RSVP or register you.
                 </p>

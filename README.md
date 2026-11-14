@@ -20,8 +20,9 @@ calendar that flags real time conflicts.
   *Schedule unknown*. Optional interests re-rank results. No times are ever guessed.
 - **My Campus Life** — month, week and agenda views combining classes, course deadlines, club meetings and events.
   Click any item for details; real overlaps are flagged with the exact window (assignment due times never count).
-- **Discover** — 28 real UMass organizations with search, category filters, sorting and source-linked profiles.
-- **Campus Events** — 19 verified upcoming events (official links, host club) plus clearly labeled sample events.
+- **Discover** — 78 real UMass organizations with search, category filters, sorting and source-linked profiles.
+- **Campus Events** — 388 verified events from the public Campus Pulse and UMass Events Calendar feeds (official
+  links, host club when known, deduplicated across sources), paged for speed, plus clearly labeled sample events.
 - **My Clubs** — follow/unfollow (tracking only, not membership), upcoming activity, persistence in `localStorage`
   that stays in sync across open tabs.
 - **Canvas-style shell** — dashboard, global navigation and To Do panel matched to the real Canvas layout.
@@ -60,8 +61,8 @@ The demo semester (Sep 2 – Dec 10, 2026) bounds weekly classes and club meetin
 ## Tests
 
 ```bash
-npm test           # logic tests: overlaps, deadlines, duplicates, semester bounds, verified dates, Find My Fit
-npm run test:e2e   # browser suite (191 checks); needs `npm run dev` running and Google Chrome installed
+npm test           # logic + feed tests: overlaps, deadlines, duplicates, semester bounds, feed parsing, snapshot integrity
+npm run test:e2e   # browser suite (194 checks); needs `npm run dev` running and Google Chrome installed
 ```
 
 Both suites use a fixed clock (default `2026-11-13T12:00:00`, America/New_York) so results never depend on today's
@@ -70,13 +71,28 @@ date. Override with `MYCLUBS_TEST_NOW`, `MYCLUBS_TEST_TZ`, `MYCLUBS_BASE_URL` an
 ## Built with
 
 React 19, TypeScript, Vite, Tailwind CSS v4, React Router, Lucide icons. No backend: state lives in `localStorage`.
-Club and event data were pulled from Campus Pulse's public listings and committed as static TypeScript.
+Club and event data come from public feeds and are committed as a dated snapshot (`src/data/generated/campus-data.json`).
+
+## Data sources and refresh
+
+| Source | Access | Used for |
+| --- | --- | --- |
+| Campus Pulse public events RSS (`/engage/events.rss`) | Public subscription feed | Events, event hosts |
+| UMass Amherst Events Calendar iCalendar (`events.umass.edu/calendar/1.ics`) | Public subscription feed | Events (deduplicated against Campus Pulse) |
+| Campus Pulse public organization pages | Public pages | Profiles of the 28 curated clubs |
+| Campus Pulse `/engage/api/` | Disallowed by robots.txt | **Not used** |
+| Instagram / Facebook APIs | Need Meta app review and tokens | **Not used**; profile links only |
+
+- `npm run sync:data` refreshes the snapshot (about 2 seconds). Vercel runs it on every deploy (`npm run build:fresh`).
+  A source that fails keeps its previous data, and the UI shows each source's last successful update.
+- Nothing is fetched at runtime (the feeds don't allow cross-origin requests), so the app never claims to be live.
+- 28 curated organizations have full public profiles; 50 more are *event hosts* from the events feed, shown with
+  their official name, verified events and a Campus Pulse link — no description, contacts or schedule are invented.
 
 ## Data and honesty
 
-- 28 active organizations and 19 public events from Campus Pulse (retrieved 2026-11-13); every profile and event links
-  to its source. Meeting times appear only when a listing states day, start and end time (Chess Club, Accounting
-  Association); other clubs are shown as *schedule unknown*.
+- Meeting times appear only when a listing states day, start and end time (Chess Club, Accounting Association);
+  other clubs are shown as *schedule unknown* in Find My Fit, with the reason.
 - No invented emails, member counts, reviews or events. Reviews are demo reviews written in your browser.
 - Following a club is not membership; saving an event is not an RSVP.
 - Courses, the weekly class schedule, deadlines and sample events are fictional demo data, generated relative to today.

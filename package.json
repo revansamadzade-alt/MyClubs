@@ -8,8 +8,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/unit.test.mjs",
-    "test:e2e": "node tests/e2e/qa.mjs"
+    "test": "node --test tests/unit.test.mjs tests/feeds.test.mjs",
+    "test:e2e": "node tests/e2e/qa.mjs",
+    "sync:data": "node scripts/sync-data.mjs",
+    "build:fresh": "npm run sync:data && npm run build"
   },
   "dependencies": {
     "lucide-react": "^0.511.0",

@@ -163,8 +163,9 @@ await section('1 Search', async () => {
   n = await search('zzzz');
   check('1 Search', 'no-match empty state', n.length === 0 && (await ev(`return document.body.textContent.includes('No organizations match')`)));
   await click(`byText('main button', 'Clear filters')`);
-  check('1 Search', 'Clear filters restores 28', (await ev(`return cardTitles().length`)) === 28 && (await ev(`return $('main input[type=search]').value === ''`)));
-  check('1 Search', 'result count text', await ev(`return document.body.textContent.includes('Showing 28 of 28 organizations')`));
+  const totalClubs = await ev(`return (+((document.body.textContent.match(/Showing (\\d+) of \\1 organizations/) || [])[1] || 0))`);
+  check('1 Search', `Clear filters restores all (${totalClubs})`, totalClubs >= 50 && (await ev(`return cardTitles().length`)) === totalClubs && (await ev(`return $('main input[type=search]').value === ''`)));
+  check('1 Search', 'result count text matches cards', await ev(`return (+((document.body.textContent.match(/Showing (\\d+) of \\1 organizations/) || [])[1] || 0)) === cardTitles().length`));
 });
 
 // 2. Category
@@ -181,10 +182,10 @@ await section('2 Category', async () => {
   await ev(`typeInto($('main input[type=search]'), ''); return true`); await sleep(100);
   await click(chip('Business'));
   n = (await ev(`return cardTitles()`)).sort();
-  check('2 Category', 'Business → 4', JSON.stringify(n) === JSON.stringify(['180 Degrees Consulting', 'Accounting Association', 'Isenberg Investment Club', 'Isenberg Sustainability Club']), n);
-  check('2 Category', 'only categories with clubs shown (no Career chip)', !(await ev(`return !!${chip('Career')}`)));
+  check('2 Category', 'Business includes curated business clubs', ['180 Degrees Consulting', 'Accounting Association', 'Isenberg Investment Club', 'Isenberg Sustainability Club'].every((x) => n.includes(x)) && (await ev(`return cards().every(c => c.textContent.includes('Business'))`)), n);
+  check('2 Category', 'chip counts add up to the directory', await ev(`const chips = $$('[aria-label="Filter by category"] button'); const all = +chips[0].textContent.match(/(\\d+)/)[1]; return chips.slice(1).reduce((s, c) => s + +c.textContent.match(/(\\d+)\\s*$/)[1], 0) === all`));
   await click(chip('All'));
-  check('2 Category', 'All → 28', (await ev(`return cardTitles().length`)) === 28);
+  check('2 Category', 'All → full directory', (await ev(`return cardTitles().length`)) === (await ev(`return (+((document.body.textContent.match(/Showing (\\d+) of \\1 organizations/) || [])[1] || 0))`)));
 });
 
 // 3. Sort + show
@@ -193,16 +194,16 @@ await section('3 Sort', async () => {
   let n = await ev(`return cardTitles()`);
   check('3 Sort', 'default A–Z', JSON.stringify(n) === JSON.stringify([...n].sort((a, b) => a.localeCompare(b))), n.slice(0, 3));
   await ev(`typeInto($$('main select')[1], 'name-desc'); return true`);
-  await waitFor(`cardTitles()[0] === 'Women in Cybersecurity at UMass Amherst'`, 3000);
+  await waitFor(`cardTitles()[0].localeCompare(cardTitles().at(-1)) > 0`, 3000);
   n = await ev(`return cardTitles()`);
-  check('3 Sort', 'Z–A', JSON.stringify(n) === JSON.stringify([...n].sort((a, b) => b.localeCompare(a))) && n[0] === 'Women in Cybersecurity at UMass Amherst', n.slice(0, 3));
+  check('3 Sort', 'Z–A', JSON.stringify(n) === JSON.stringify([...n].sort((a, b) => b.localeCompare(a))) && n[0].localeCompare(n.at(-1)) > 0, n.slice(0, 3));
   check('3 Sort', 'sort stored in URL', (await path()).includes('sort=name-desc'));
   await ev(`typeInto($$('main select')[1], 'name'); return true`); await sleep(300);
   await ev(`typeInto($$('main select')[0], 'following'); return true`); await sleep(300);
   n = await ev(`return cardTitles()`);
   check('3 Sort', 'Show: Following (seeded 2)', JSON.stringify(n) === JSON.stringify(['Chess Club', 'UMass Robotics Club']), n);
   await ev(`typeInto($$('main select')[0], 'not'); return true`); await sleep(300);
-  check('3 Sort', 'Show: Not following → 26', (await ev(`return cardTitles().length`)) === 26);
+  check('3 Sort', 'Show: Not following → all but 2', await ev(`const all = +((document.body.textContent.match(/of (\\d+) organizations/) || [])[1] || 0); return all >= 50 && cardTitles().length === all - 2`));
 });
 
 // 4. Profile
@@ -269,13 +270,16 @@ await section('8 Save', async () => {
   await goto('/clubs/events');
   const sbtn = (t) => `card(${JSON.stringify(t)}).querySelector('button[aria-pressed]')`;
   const tab = (t) => `byText('[aria-label="Event lists"] button', ${JSON.stringify(t)})`;
-  check('8 Save', 'tabs initial: Saved (2), From clubs (0)', await ev(`return ${tab('Saved')}.textContent.includes('(2)') && ${tab('From clubs')}.textContent.includes('(0)')`), await ev(`return $('[aria-label="Event lists"]').textContent`));
-  check('8 Save', 'every event card labeled verified XOR sample', await ev(`return cards().every(c => c.textContent.includes('Verified · Campus Pulse') !== c.textContent.includes('Sample event'))`));
-  check('8 Save', 'verified cards link to host club, sample cards never do', await ev(`return cards().every(c => c.textContent.includes('Verified · Campus Pulse') === $$('a', c).some(a => a.pathname.startsWith('/clubs/discover/')))`));
+  check('8 Save', 'tabs initial: Saved (2)', await ev(`return ${tab('Saved')}.textContent.includes('(2)')`), await ev(`return $('[aria-label="Event lists"]').textContent`));
+  check('8 Save', 'long list is paged (fast) with Show more', await ev(`return cards().length <= 40 && !!byText('main button', 'Show') && byText('main button', 'Show').textContent.includes('more')`));
+  check('8 Save', 'every event card labeled verified XOR sample', await ev(`return cards().every(c => c.textContent.includes('Verified · ') !== c.textContent.includes('Sample event'))`));
+  check('8 Save', 'sample cards never link to clubs; club-linked cards are verified', await ev(`return cards().every(c => !$$('a', c).some(a => a.pathname.startsWith('/clubs/discover/')) || c.textContent.includes('Verified · '))`));
+  check('8 Save', 'both public sources credited', await ev(`const t = $('aside[aria-label="Data sources"]').textContent; return t.includes('Campus Pulse public events RSS') && t.includes('UMass Amherst Events Calendar')`));
+  check('8 Save', 'data source note says snapshot, not live', await ev(`const n = $('aside[aria-label="Data sources"]'); return !!n && n.textContent.includes('snapshot, not live') && n.textContent.includes('updated')`));
   await ev(`typeInto($$('main select')[1], 'verified'); return true`); await sleep(200);
-  const vc = await ev(`return { n: cards().length, all: cards().every(c => c.textContent.includes('Verified · Campus Pulse')) }`);
+  const vc = await ev(`return { n: cards().length, all: cards().every(c => c.textContent.includes('Verified · ')) }`);
   check('8 Save', `source filter: verified only (${vc.n})`, vc.all && vc.n >= 15, JSON.stringify(vc));
-  await ev(`typeInto($$('main select')[1], 'all'); return true`); await sleep(200);
+  await goto('/clubs/events?src=sample&q=capture');
   await click(sbtn('Capture the Flag Practice Night'));
   check('8 Save', 'Save → pressed + Saved (3)', await ev(`return ${sbtn('Capture the Flag Practice Night')}.getAttribute('aria-pressed') === 'true' && ${tab('Saved')}.textContent.includes('(3)')`));
   check('8 Save', 'localStorage savedEvents', (await ev(`return ls('myclubs:savedEvents')`)).includes('ev-ctf'));
@@ -293,7 +297,7 @@ await section('8 Save', async () => {
   const t = (await ev(`return cardTitles()`)).sort();
   check('9 Saved views', 'Saved tab lists saved events', JSON.stringify(t) === JSON.stringify(['Capture the Flag Practice Night', 'Fall A Cappella Showcase', 'Fall Career & Internship Fair']), t);
   await click(tab('From clubs'));
-  check('9 Saved views', 'From-clubs tab explains no verified events', await ev(`return cardTitles().length === 0 && $('main').textContent.includes('No verified events from the clubs you follow yet')`));
+  check('9 Saved views', 'From-clubs tab = only followed clubs\' verified events', await ev(`return cardTitles().length === 0 ? $('main').textContent.includes('No verified events from the clubs you follow yet') : cards().every(c => c.textContent.includes('Verified · ') && $$('a', c).some(a => ['/clubs/discover/chessclub', '/clubs/discover/roboticsclub'].includes(a.pathname)))`));
   await goto('/clubs/campus-life');
   await click(view('Agenda'));
   const life = await ev(`return $('main').textContent`);
@@ -371,11 +375,11 @@ await section('7 Persist', async () => {
 await section('13 Real data', async () => {
   await goto('/clubs/discover');
   const ids = await ev(`return cards().map(c => c.querySelector('h3 a').getAttribute('href').split('/').pop())`);
-  check('13 Real data', '28 organizations, all Campus Pulse badged', ids.length === 28 && (await ev(`return cards().every(c => c.textContent.includes('Campus Pulse'))`)), ids.length);
+  check('13 Real data', `${ids.length} organizations, all Campus Pulse badged`, ids.length >= 50 && ids.length <= 100 && (await ev(`return cards().every(c => c.textContent.includes('Campus Pulse'))`)), ids.length);
   let bad = [];
   for (const id of ids) {
     await goto(`/clubs/discover/${id}`);
-    const ok = await ev(`const t = $('main').textContent; const a = $$('main a'); return a.some(x => x.href === 'https://umassamherst.campuslabs.com/engage/organization/${id}') && !a.some(x => x.href.startsWith('mailto:')) && !/\\d+ members/.test(t) && t.includes('Source: Campus Pulse listing, retrieved')`);
+    const ok = await ev(`const t = $('main').textContent; const a = $$('main a'); return a.some(x => x.href.startsWith('https://umassamherst.campuslabs.com/engage/')) && !a.some(x => x.href.startsWith('mailto:')) && !/\\d+ members/.test(t) && t.includes('Source: Campus Pulse listing, retrieved')`);
     if (!ok) bad.push(id);
   }
   check('13 Real data', 'every profile: source link, retrieval date, no emails, no member counts', bad.length === 0, bad);
@@ -458,7 +462,7 @@ await section('12 Calendar', async () => {
   check('A Follow', 'still followed after refresh (count 3)', await ev(`return $$('main section')[0].textContent.includes('Outing Club') && $('main').textContent.includes('You follow 3 clubs')`));
 
   // Test B
-  await goto('/clubs/events');
+  await goto('/clubs/events?src=sample&q=pitch');
   await click(`card('Startup Pitch Night').querySelector('button[aria-pressed]')`);
   await goto('/clubs/campus-life');
   await click(view('Agenda'));
@@ -619,7 +623,8 @@ await section('15 Find My Fit', async () => {
   check('F Fit', 'overlap explained exactly (Thu lab, 90 min)', await ev(`const fc = $('#fit-chessclub').closest('article'); return fc.textContent.includes('Overlaps COMPSCI 235 Lab (6:30 – 8:00 PM) for 90 min')`));
   check('F Fit', 'clubs without times are separate, no times shown', unknown.includes('UMass Robotics Club') && unknown.includes('Habitat for Humanity') && !(await ev(`return !!$('#fit-roboticsclub')`)), unknown.length);
   const total = fits.length + partial.length + (await namesIn('conflicts')).length + unknown.length;
-  check('F Fit', `every club classified exactly once (${total})`, total === 28);
+  const allNames = [...fits, ...partial, ...(await namesIn('conflicts')), ...unknown];
+  check('F Fit', `every club classified exactly once (${total})`, total >= 50 && new Set(allNames).size === total);
   check('F Fit', 'only verified meeting schedules produce meetings', await ev(`return $$('main article').filter(a => a.textContent.includes('Weekly meeting') || a.textContent.includes('Club meeting')).map(a => a.querySelector('h3').textContent.trim()).every(n => ['Accounting Association', 'Chess Club'].includes(n))`));
 
   // Interests re-rank
@@ -674,17 +679,18 @@ await section('16 Time', async () => {
   await goto('/clubs/events/cp-12912251');
   await click(`$('main header button[aria-pressed]')`);
   await setClock('2026-11-25T12:00:00');
-  await goto('/clubs/events');
+  await goto('/clubs/events?q=food%20fair');
   check('T Time', 'ended verified event left upcoming list', !(await ev(`return cardTitles()`)).includes('Fall 2026 Food Fair'));
   await click(`byText('[aria-label="Event lists"] button', 'Past')`);
   check('T Time', 'Past tab lists it with Ended badge', await ev(`const c = card('Fall 2026 Food Fair'); return !!c && c.textContent.includes('Ended')`));
+  await goto('/clubs/events?view=past&q=wilderness');
   check('T Time', 'unsaved ended events cannot be saved', await ev(`const c = card('Wilderness First Aid Course (Wild Med)'); const b = $$('button', c).find(x => x.textContent.includes('Ended')); return !!b && b.disabled`));
-  await click(`byText('[aria-label="Event lists"] button', 'Saved')`);
+  await goto('/clubs/events?view=saved');
   check('T Time', 'saved ended event stays visible in Saved', await ev(`const c = card('Fall 2026 Food Fair'); return !!c && c.textContent.includes('Ended') && !!c.querySelector('button[aria-pressed="true"]')`));
   await goto('/clubs/events/cp-12912251');
   check('T Time', 'detail says ended, published date unchanged', await ev(`const t = $('main').textContent; return t.includes('This event ended on') && t.includes('Saturday, November 14') && t.includes('12:00 – 3:00 PM')`));
   await goto('/clubs/discover/vietnamesestudentassociation');
-  check('T Time', 'profile separates past events', await ev(`const t = $('main').textContent; return t.includes('Past events (1)') && t.includes('VSA Escape Room')`));
+  check('T Time', 'profile separates past events', await ev(`const t = $('main').textContent; return /Past events \\(\\d+\\)/.test(t) && t.includes('VSA Escape Room')`));
 
   await setClock('2026-11-13T23:59:50');
   await goto('/clubs/campus-life');

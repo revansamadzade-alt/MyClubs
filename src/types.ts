@@ -12,7 +12,9 @@ export type Category =
   | 'Career'
   | 'Gaming'
   | 'Media'
-  | 'Wellness';
+  | 'Wellness'
+  | 'Faith & Spirituality'
+  | 'Campus Life';
 
 /** A weekly recurring club meeting. `dow` is 0 (Sunday) – 6 (Saturday); times are 24h "HH:MM". */
 export interface Meeting {
@@ -45,6 +47,8 @@ export interface Club {
   links: ClubLink[];
   sourceUrl: string;
   verifiedOn: string;
+  /** "event-host": known only as a host in the public events feed (no profile text, contacts or schedule). */
+  sourceKind?: 'profile' | 'event-host';
 }
 
 export interface CampusEvent {
@@ -58,7 +62,7 @@ export interface CampusEvent {
   clubId?: string;
   host: string;
   /** Present only for real events from an official public listing. Absent means demo/sample data. */
-  verified?: { url: string; retrievedOn: string };
+  verified?: { url: string; retrievedOn: string; source?: string };
 }
 
 export interface Course {

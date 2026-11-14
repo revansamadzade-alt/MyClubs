@@ -99,8 +99,8 @@ test('verified events keep their published dates and sources', () => {
   assert.equal(fair.end.toISOString(), '2026-11-14T20:00:00.000Z');
   for (const e of VERIFIED_EVENTS) {
     assert.ok(e.start < e.end, `${e.id} start before end`);
-    assert.match(e.verified.url, /^https:\/\/umassamherst\.campuslabs\.com\/engage\/event\/\d+$/);
-    assert.ok(CLUBS.some((c) => c.id === e.clubId), `${e.id} host exists`);
+    assert.match(e.verified.url, /^https:\/\/(umassamherst\.campuslabs\.com\/engage\/event\/\d+$|events\.umass\.edu\b)/);
+    if (e.clubId) assert.ok(CLUBS.some((c) => c.id === e.clubId), `${e.id} host club exists`);
   }
   assert.ok(EVENTS.filter((e) => !e.verified).every((e) => !e.clubId), 'sample events never link to clubs');
 });

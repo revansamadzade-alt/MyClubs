@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarCheck2, SearchX } from 'lucide-react';
+import { DataSources } from '../../components/DataSources';
 import type { Category } from '../../types';
 import { CATEGORIES, CLUBS } from '../../data/clubs';
 import { useStore } from '../../context/StoreContext';
@@ -56,13 +57,14 @@ export default function Discover() {
     <>
       <PageHeader
         title="Discover Student Organizations"
-        description="Real UMass Amherst student organizations from their public Campus Pulse listings. Follow the ones you're curious about; listed meeting schedules show up in My Campus Life."
+        description="Real UMass Amherst student organizations from public Campus Pulse pages and its public events feed. Follow the ones you're curious about; listed meeting schedules and verified events show up in My Campus Life."
         actions={
           <Link to="/clubs/fit" className="btn btn-primary">
             <CalendarCheck2 size={16} aria-hidden /> Find My Fit
           </Link>
         }
       />
+      <DataSources ids={['campus-pulse-orgs', 'campus-pulse-rss']} what="Organization directory" />
 
       <div className="space-y-3 rounded border border-line bg-surface p-4">
         <div className="flex flex-col gap-3 sm:flex-row">
