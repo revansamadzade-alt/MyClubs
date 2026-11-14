@@ -1495,12 +1495,43 @@ await section('25 ClubFund', async () => {
   await goto('/');
   await ev(`localStorage.clear(); return true`);
 
-  // Without Supabase settings: ClubFund explains itself; the rest of MyClubs is untouched.
+  // The app under test may or may not have Supabase settings (.env.local); either way ClubFund must render.
   await goto('/clubs/clubfund');
   check(A, 'ClubFund in the MyClubs navigation', await ev(`return !!byText('#clubs-nav a', 'ClubFund')`));
-  check(A, 'not configured: clear setup message, privacy statement, no crash', await ev(`const t = $('main').textContent; return t.includes("ClubFund isn't set up") && t.includes('It is not published on the blockchain.') && !!$('main h1')`));
-  await goto('/clubs/discover');
-  check(A, 'rest of MyClubs works without Supabase', (await ev(`return cardTitles().length`)) === 78);
+  check(A, 'ClubFund page renders (configured or not)', await ev(`const t = $('main').textContent; return !!$('main h1') && (t.includes("ClubFund isn't set up") || !!$('[data-testid=cf-email]')) && t.includes('It is not published on the blockchain.')`));
+
+  // Without Supabase settings (variables blanked; the process environment overrides .env files): ClubFund explains
+  // itself and the rest of MyClubs is untouched.
+  const startVite = async (port, env) => {
+    const proc = spawn(process.execPath, [fileURLToPath(new URL('../../node_modules/vite/bin/vite.js', import.meta.url)), '--port', String(port), '--strictPort'], {
+      cwd: fileURLToPath(new URL('../..', import.meta.url)),
+      env: { ...process.env, ...env },
+      stdio: 'ignore',
+    });
+    for (let i = 0; i < 80; i++) {
+      try {
+        if ((await fetch(`http://localhost:${port}`)).ok) break;
+      } catch {}
+      await sleep(250);
+    }
+    return proc;
+  };
+  const bare = await startVite(5176, { VITE_SUPABASE_URL: '', VITE_SUPABASE_PUBLISHABLE_KEY: '' });
+  try {
+    const visit = async (p) => {
+      await markLeaving(send);
+      await send('Page.navigate', { url: `http://localhost:5176${p}` });
+      await waitFor(ready, 20000);
+      await settle();
+    };
+    await visit('/clubs/clubfund');
+    check(A, 'not configured: clear setup message, privacy statement, no crash', await ev(`const t = $('main').textContent; return t.includes("ClubFund isn't set up") && t.includes('It is not published on the blockchain.') && !!$('main h1')`));
+    await visit('/clubs/discover');
+    check(A, 'rest of MyClubs works without Supabase', (await ev(`return cardTitles().length`)) === 78);
+  } finally {
+    bare.kill();
+  }
+  await goto('/');
 
   // A second copy of the app with ClubFund pointed at a mocked, same-origin Supabase.
   const CF_PORT = 5175;
