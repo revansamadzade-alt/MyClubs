@@ -209,7 +209,7 @@ accessibility and 375 px layout.
 Not tested automatically: real email delivery, a real Phantom signature or transaction, the deployed Edge Functions, a
 live Devnet transaction, and the hook in the live project. Those are the manual test above.
 
-## Hardening on `fix/demo-readiness` (2026-11-15) — migration and redeploy pending approval
+## Hardening on `fix/demo-readiness` (2026-11-15) — migration applied and functions redeployed
 
 **Wallet-verification lockout ("Too many verification requests").** Every signing attempt used to mint a new
 challenge, so cancelled, failed or stuck Phantom signatures used up the 5-per-10-minutes limit. Live data showed five
@@ -235,7 +235,7 @@ be claimed.
 **Devnet RPC** reads retry with jittered backoff and honour `Retry-After`; identical browser reads share one request;
 confirmation polling slows down while Devnet errors. `sendTransaction` is never repeated.
 
-**Pending deployment** (in this order; both additive and backward compatible):
+**Deployed 2026-11-15 07:44 UTC** (in this order; both additive and backward compatible):
 
 1. `npx supabase@2.122.0 db push --linked` → applies `20261115090000_clubfund_challenge_reuse_and_rate_limits.sql`.
 2. `npx supabase@2.122.0 functions deploy wallet-challenge wallet-link wallet-unlink campaign-contribute --project-ref zanhvwuvuvfxetqkojbw --use-api`.

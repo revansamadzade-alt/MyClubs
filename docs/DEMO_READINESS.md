@@ -10,6 +10,13 @@ five unfinished link attempts for one wallet (2026-11-15 02:58–02:59 UTC). Non
 and they ended in the rate limit. That limit has expired; no challenge is open now. Every contribution test so far
 uses a mocked Supabase, a mocked Devnet RPC and a scripted wallet.
 
+## Deployed 2026-11-15 (approved steps 1–3)
+
+- 07:44 UTC: migration `20261115090000_clubfund_challenge_reuse_and_rate_limits.sql` applied (`db push`); verified new functions and table, service-role-only grants, RLS, existing objects and campaigns unchanged. Supabase had no platform backup yet (PITR off, daily list empty), so a read-only snapshot of all public rows and function definitions was taken first.
+- 07:44 UTC: `wallet-challenge`, `wallet-link`, `wallet-unlink`, `campaign-contribute` redeployed from `5da6db2` (version 2, ACTIVE, `verify_jwt: true`); credential-free probes unchanged; logs show clean boots and only the expected origin warnings.
+- 07:45 UTC: `demo-club-equipment` recipient set to `6Q5tJXKhJ6yL6AYeHkyrKcFvKgEjmszCQniegH5qP8gV` (exactly one row; the other five untouched). The live app shows it as the only campaign open for Devnet contributions.
+- Not done (by request): Auth hook, `CLUBFUND_ALLOWED_ORIGINS`, Vercel, GitHub push. No real wallet link or Devnet contribution yet.
+
 ## Completed fixes
 
 | # | Problem | Root cause | Fix | Files |
