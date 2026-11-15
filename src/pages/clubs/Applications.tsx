@@ -120,7 +120,7 @@ export default function Applications() {
         }
       />
 
-      <section aria-labelledby="profile-card" className="mb-6 flex flex-wrap items-center gap-4 rounded border border-line bg-white p-4" data-testid="profile-card">
+      <section aria-labelledby="profile-card" className="card mb-6 flex flex-wrap items-center gap-4 p-4" data-testid="profile-card">
         <div className="min-w-0 flex-1 basis-60">
           <h2 id="profile-card" className="font-bold text-ink">
             My applicant profile
@@ -137,7 +137,7 @@ export default function Applications() {
       </section>
 
       {!demo && (
-      <section aria-labelledby="demo-app" className="mb-6 flex flex-wrap items-center gap-4 rounded border border-dashed border-[#9aa5ad] bg-surface p-4">
+      <section aria-labelledby="demo-app" className="mb-6 flex flex-wrap items-start gap-4 rounded-md border border-dashed border-[#9aa5ad] bg-surface p-4 sm:items-center">
         <ClubAvatar club={DEMO_ORG} />
         <div className="min-w-0 flex-1 basis-60">
           <h2 id="demo-app" className="flex flex-wrap items-center gap-2 font-bold text-ink">

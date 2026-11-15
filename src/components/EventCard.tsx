@@ -12,7 +12,7 @@ export function EventCard({ event, compact }: { event: CampusEvent; compact?: bo
   const href = `/clubs/events/${event.id}`;
 
   return (
-    <article className="flex gap-4 rounded border border-line bg-white p-4 transition-shadow hover:shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
+    <article className="card card-hover flex gap-4 p-4">
       <DateTile date={event.start} />
       <div className="min-w-0 flex-1">
         {!compact && (

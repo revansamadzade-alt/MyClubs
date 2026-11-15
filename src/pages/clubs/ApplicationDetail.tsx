@@ -259,7 +259,7 @@ function TrackerForm({ club, app }: { club: Club; app: TrackedApplication }) {
         </span>
       </label>
       {status === 'decision' && (
-        <fieldset className="space-y-3 rounded border border-line-soft p-3">
+        <fieldset className="space-y-3 rounded-md border border-line-soft p-3">
           <legend className="px-1 text-sm font-bold">Decision (self-reported)</legend>
           <label className="block">
             <span className="mb-1 block text-sm">Outcome</span>
@@ -381,7 +381,7 @@ export default function ApplicationDetail() {
         </div>
         <aside className="space-y-4">
           {demo ? (
-            <div className="flex gap-2 rounded border border-warn/40 bg-warn-soft p-4 text-sm text-ink">
+            <div className="flex gap-2 rounded-md border border-warn/40 bg-warn-soft p-4 text-sm text-ink">
               <Info size={18} aria-hidden className="mt-0.5 shrink-0 text-warn" />
               <p>
                 <strong>Demo only — not sent to the organization.</strong> {club.name} is fictional. Everything here stays in this browser.

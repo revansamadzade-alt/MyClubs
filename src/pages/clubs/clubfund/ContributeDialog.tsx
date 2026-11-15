@@ -140,7 +140,7 @@ export function ContributeDialog({
         if (working) e.preventDefault(); // keep the dialog while a transaction is in flight
       }}
       aria-labelledby={`${id}-title`}
-      className="m-auto w-[calc(100%-2rem)] max-w-lg rounded border border-line bg-white p-0 text-ink shadow-xl backdrop:bg-black/40"
+      className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-md border border-line bg-white p-0 text-ink shadow-xl backdrop:bg-black/40"
       data-testid="cf-contribute-dialog"
     >
       {open && (
@@ -167,7 +167,7 @@ export function ContributeDialog({
             >
               <div className="text-sm">
                 <p className="text-ink-soft">Recipient (developer-controlled Devnet demo wallet)</p>
-                <p className="break-all font-mono text-ink" data-testid="cf-recipient">
+                <p className="mt-1 break-all rounded-md bg-surface px-2 py-1.5 font-mono text-[0.8125rem] leading-snug text-ink" data-testid="cf-recipient">
                   {campaign.recipient_address}
                 </p>
               </div>
@@ -220,7 +220,7 @@ export function ContributeDialog({
 
           {step === 'review' && lamports !== null && (
             <div className="mt-4 space-y-4">
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm" data-testid="cf-review">
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-md border border-line-soft bg-surface p-3 text-sm" data-testid="cf-review">
                 <dt className="text-ink-soft">Campaign</dt>
                 <dd>{campaign.title}</dd>
                 <dt className="text-ink-soft">From</dt>
@@ -293,7 +293,7 @@ function Result({ outcome, onClose, onRetry, onCheckAgain }: { outcome: Outcome;
   if (outcome.kind === 'verified') {
     const c = outcome.result.contribution;
     return (
-      <div className="mt-4 space-y-3" role="status" data-testid="cf-result" data-kind="verified">
+      <div className="mt-4 space-y-3 rounded-md border border-success/40 bg-[#e8f5ee] p-4" role="status" data-testid="cf-result" data-kind="verified">
         <p className="flex items-center gap-2 text-lg font-bold text-success">
           <BadgeCheck size={22} aria-hidden /> Contribution verified
         </p>

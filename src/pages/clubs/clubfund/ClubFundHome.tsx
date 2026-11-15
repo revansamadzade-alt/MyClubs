@@ -31,10 +31,11 @@ function Steps({ current }: { current: 1 | 2 | 3 | 4 }) {
         return (
           <li key={s.n} aria-current={active ? 'step' : undefined} className="min-w-0">
             <span aria-hidden className={cx('block h-1.5 rounded-full', done ? 'bg-success' : active ? 'bg-link' : 'bg-line-soft')} />
-            <span className={cx('mt-1.5 flex items-center gap-1 text-xs', active ? 'font-bold text-ink' : 'text-ink-soft')}>
-              <s.icon size={14} aria-hidden className="shrink-0" />
+            {/* labels wrap on phones rather than being cut off ("Sign to prove o…") */}
+            <span className={cx('mt-1.5 flex items-start gap-1 text-xs leading-snug', active ? 'font-bold text-ink' : done ? 'text-success' : 'text-ink-soft')}>
+              <s.icon size={14} aria-hidden className="mt-px shrink-0" />
               {done && <span className="sr-only">Completed: </span>}
-              <span className="truncate">{s.label}</span>
+              <span className="min-w-0">{s.label}</span>
             </span>
           </li>
         );
@@ -107,7 +108,7 @@ function LinkWallet() {
         {!cf.wallet || !cf.account ? (
           <WalletPicker wallets={cf.wallets} onConnect={cf.connect} />
         ) : (
-          <div className="rounded border border-line p-4" data-testid="cf-connected">
+          <div className="rounded-md border border-line p-4" data-testid="cf-connected">
             <p className="flex items-center gap-2 text-sm text-ink">
               {cf.wallet.icon && <img src={cf.wallet.icon} alt="" width={20} height={20} className="rounded" />}
               <strong>{cf.wallet.name}</strong> connected · not linked yet

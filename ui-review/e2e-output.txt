@@ -1,0 +1,7 @@
+
+> myclubs@0.1.0 test:e2e
+> node tests/e2e/qa.mjs
+
+AREA SUMMARY {"1 Search":{"pass":9,"fail":0},"2 Category":{"pass":6,"fail":0},"3 Sort":{"pass":5,"fail":0},"4 Profile":{"pass":12,"fail":0},"5 Follow":{"pass":6,"fail":0},"6 My Clubs":{"pass":8,"fail":0},"8 Save":{"pass":15,"fail":0},"9 Saved views":{"pass":9,"fail":0},"7 Persist":{"pass":12,"fail":0},"13 Real data":{"pass":4,"fail":0},"10 Nav":{"pass":18,"fail":0},"A Follow":{"pass":2,"fail":0},"B Save":{"pass":9,"fail":0},"C Meetings":{"pass":4,"fail":0},"D Conflicts":{"pass":7,"fail":0},"Calendar views":{"pass":5,"fail":0},"Persist":{"pass":1,"fail":0},"E Regression":{"pass":2,"fail":0},"V Events":{"pass":13,"fail":0},"F Fit":{"pass":19,"fail":0},"T Time":{"pass":11,"fail":0},"S Sync":{"pass":5,"fail":0},"M Week":{"pass":4,"fail":0},"Z Demo":{"pass":6,"fail":0},"P Apps":{"pass":29,"fail":0},"Q Forms":{"pass":55,"fail":0},"R Reliability":{"pass":29,"fail":0},"S Features":{"pass":38,"fail":0},"U A11y":{"pass":22,"fail":0},"W ClubFund":{"pass":54,"fail":0},"X Contributions":{"pass":44,"fail":0},"H Home":{"pass":15,"fail":0},"11 Responsive":{"pass":2,"fail":0}}
+TOTAL 480/480 passed
+CONSOLE ISSUES 0

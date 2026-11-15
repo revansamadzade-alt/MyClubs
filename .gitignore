@@ -24,3 +24,7 @@ supabase/.temp/
 .vercel
 .env*
 !.env.example
+
+# UI review screenshots stay on disk for local comparison (large binaries, not tracked)
+ui-review/**/*.png
+ui-review/*.log

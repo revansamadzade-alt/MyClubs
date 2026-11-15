@@ -31,7 +31,7 @@ function FitCard({ fit, color }: { fit: ClubFit; color: string }) {
   const basis = hasMeetings && hasEvents ? 'Verified meetings and events' : hasMeetings ? 'Verified weekly schedule' : 'Verified upcoming events';
 
   return (
-    <article className="card flex flex-col p-4" aria-labelledby={`fit-${club.id}`}>
+    <article className="card card-hover flex flex-col p-4" aria-labelledby={`fit-${club.id}`}>
       <div className="flex items-start gap-3">
         <ClubAvatar club={club} size="sm" />
         <div className="min-w-0 flex-1">
@@ -47,7 +47,7 @@ function FitCard({ fit, color }: { fit: ClubFit; color: string }) {
           </div>
         </div>
       </div>
-      <p className="mt-3 text-sm font-bold" style={{ color }}>
+      <p className="mt-3 border-t border-line-soft pt-3 text-sm font-bold" style={{ color }}>
         {free} of {slots.length} upcoming time{slots.length === 1 ? '' : 's'} free
       </p>
       <ul className="mt-2 space-y-1.5 text-sm">
@@ -64,7 +64,7 @@ function FitCard({ fit, color }: { fit: ClubFit; color: string }) {
               </span>
               <span className="text-ink-soft"> · {item.kind === 'meeting' ? item.subtitle : item.title}</span>
               {overlaps.map((o) => (
-                <span key={o.item.id} className="block text-xs font-bold text-warn">
+                <span key={o.item.id} className="mt-1 block w-fit rounded bg-warn-soft px-1.5 py-0.5 text-xs font-bold text-warn">
                   Overlaps {o.item.title} ({fmtRange(o.item.start, o.item.end)}) for {minutes(o.from, o.to)} min
                 </span>
               ))}
@@ -125,7 +125,7 @@ export default function FindMyFit() {
         }
       />
 
-      <section aria-labelledby="your-schedule" className="mb-5 rounded border border-line bg-surface p-4">
+      <section aria-labelledby="your-schedule" className="mb-5 rounded-md border border-line bg-surface p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="your-schedule" className="font-bold">
             Your schedule · next {FIT_WINDOW_DAYS} days
@@ -194,7 +194,7 @@ export default function FindMyFit() {
         );
       })}
 
-      <details className="rounded border border-line" id="group-unknown">
+      <details className="rounded-md border border-line" id="group-unknown">
         <summary className="cursor-pointer px-4 py-3 font-bold">
           Schedule unknown ({unknown.length}){' '}
           <span className="font-normal text-ink-soft">

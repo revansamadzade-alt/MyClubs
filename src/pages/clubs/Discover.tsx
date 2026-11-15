@@ -82,7 +82,7 @@ export default function Discover() {
       />
       <DataSources ids={['campus-pulse-orgs', 'campus-pulse-rss']} what="Organization directory" />
 
-      <div className="space-y-3 rounded border border-line bg-surface p-4">
+      <div className="space-y-3 rounded-md border border-line bg-surface p-4">
         <div className="flex flex-col gap-3 sm:flex-row">
           <SearchInput
             value={q}

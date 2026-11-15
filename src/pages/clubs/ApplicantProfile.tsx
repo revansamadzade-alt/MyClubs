@@ -65,7 +65,7 @@ export default function ApplicantProfilePage() {
         title="My applicant profile"
         description="Optional details reused to fill in new application forms. Every field is optional."
       />
-      <p className="mb-5 flex gap-2 rounded border border-[#b3d7ee] bg-[#eef6fb] p-3 text-sm text-ink">
+      <p className="mb-5 flex gap-2 rounded-md border border-[#b3d7ee] bg-[#eef6fb] p-3 text-sm text-ink">
         <Lock size={16} aria-hidden className="mt-0.5 shrink-0 text-link" />
         Stored only in this browser. This is not an account and nothing is sent anywhere. Editing it never changes applications you already
         started.
@@ -79,7 +79,7 @@ export default function ApplicantProfilePage() {
           {profile && <span className="text-xs text-ink-soft">Saved {fmtStamp(profile.updatedAt)}</span>}
         </div>
         {errorCount > 0 && (
-          <p role="alert" className="rounded border border-badge/40 bg-[#fdeeee] p-3 text-sm font-bold text-badge">
+          <p role="alert" className="rounded-md border border-badge/40 bg-[#fdeeee] p-3 text-sm font-bold text-badge">
             {errorCount === 1 ? '1 field needs attention.' : `${errorCount} fields need attention.`}
           </p>
         )}

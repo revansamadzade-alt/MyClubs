@@ -60,7 +60,7 @@ export default function EventDetail() {
       </header>
 
       {event.end <= new Date() && (
-        <p role="note" className="mt-4 rounded border border-line bg-surface p-3 text-sm text-ink">
+        <p role="note" className="mt-4 rounded-md border border-line bg-surface p-3 text-sm text-ink">
           This event ended on {fmtLongDate(event.end)}. Its date and time are shown exactly as published.
         </p>
       )}
@@ -101,7 +101,7 @@ export default function EventDetail() {
           <h2 className="section-title mt-8">About this event</h2>
           <p className="leading-relaxed text-ink">{event.description}</p>
           {event.verified ? (
-            <div className="mt-4 flex gap-2 rounded border border-[#b3d7ee] bg-[#eef6fb] p-4 text-sm text-ink">
+            <div className="mt-4 flex gap-2 rounded-md border border-[#b3d7ee] bg-[#eef6fb] p-4 text-sm text-ink">
               <Info size={18} aria-hidden className="mt-0.5 shrink-0 text-link" />
               <div>
                 <p>
@@ -126,7 +126,7 @@ export default function EventDetail() {
             </p>
           )}
           {club && (
-            <div className="mt-6 flex flex-wrap items-center gap-3 rounded border border-line p-4">
+            <div className="mt-6 flex flex-wrap items-center gap-3 rounded-md border border-line p-4">
               <p className="min-w-0 flex-1 text-sm">
                 Follow <strong>{club.name}</strong> to see its verified events and any listed meetings in My Campus Life.
               </p>
@@ -154,7 +154,7 @@ export default function EventDetail() {
               Schedule check
             </h2>
             {conflicts.length ? (
-              <div className="rounded border border-warn/40 bg-warn-soft p-3 text-sm">
+              <div className="rounded-md border border-warn/40 bg-warn-soft p-3 text-sm">
                 <p className="flex items-center gap-1.5 font-bold text-warn">
                   <TriangleAlert size={16} aria-hidden /> Overlaps with {conflicts.length} item
                   {conflicts.length > 1 ? 's' : ''}

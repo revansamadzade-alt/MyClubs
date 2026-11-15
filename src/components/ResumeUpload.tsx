@@ -178,7 +178,7 @@ export function ResumeUpload({
         {label} <FieldTag />
       </p>
       {value && !missing ? (
-        <div className="flex flex-wrap items-center gap-3 rounded border border-line bg-white p-3" data-testid="resume-attached">
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-line bg-white p-3" data-testid="resume-attached">
           <FileText size={24} aria-hidden className="shrink-0 text-umass" />
           <div className="min-w-0 flex-1 basis-40">
             <p className="truncate font-bold text-ink">{value.name}</p>
@@ -207,7 +207,7 @@ export function ResumeUpload({
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
-          className={cx('rounded border-2 border-dashed p-5 text-center', dragging ? 'border-link bg-[#eef3f9]' : 'border-line bg-surface')}
+          className={cx('rounded-md border-2 border-dashed p-5 text-center', dragging ? 'border-link bg-[#eef3f9]' : 'border-line bg-surface')}
           data-testid="resume-drop"
         >
           <Upload size={24} aria-hidden className="mx-auto text-ink-soft" />
@@ -247,7 +247,7 @@ export function ResumeUpload({
         {help && `${help} `}PDF up to 5 MB. Stored only in this browser — never uploaded or sent to the organization.
       </p>
       {unsaved && local && (
-        <div role="alert" className="mt-2 rounded border border-warn/40 bg-warn-soft p-3 text-sm text-ink" data-testid="resume-memory-only">
+        <div role="alert" className="mt-2 rounded-md border border-warn/40 bg-warn-soft p-3 text-sm text-ink" data-testid="resume-memory-only">
           <p className="font-bold text-warn">This browser can't store files right now.</p>
           <p className="mt-1">
             {local.name} is kept for this visit only and will be gone after a refresh (storage may be blocked, full, or in private mode). Your

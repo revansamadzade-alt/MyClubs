@@ -11,7 +11,7 @@ export function DataSources({ ids, what }: { ids: string[]; what: string }) {
   const sources = DATA_SOURCES.filter((s) => ids.includes(s.id));
   if (!sources.length) return null;
   return (
-    <aside aria-label="Data sources" className="mb-4 rounded border border-line-soft bg-surface px-3 py-2 text-xs text-ink-soft">
+    <aside aria-label="Data sources" className="mb-4 rounded-md border border-line-soft bg-surface px-3 py-2 text-xs text-ink-soft">
       <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
         <Database size={13} aria-hidden className="shrink-0" />
         <span>

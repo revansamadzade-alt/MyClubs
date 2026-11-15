@@ -10,7 +10,7 @@ export default function Placeholder({ item }: { item?: NavItem }) {
   return (
     <div className="px-4 py-6 sm:px-8 lg:pl-20">
       <h1 className="border-b border-line-soft pb-5 text-[2.5rem] font-bold leading-none text-[#1b1b1b]">{label}</h1>
-      <div className="mx-auto mt-12 max-w-lg rounded border border-dashed border-line p-8 text-center">
+      <div className="mx-auto mt-12 max-w-lg rounded-md border border-dashed border-line bg-surface/50 p-8 text-center">
         <Icon size={40} strokeWidth={1.4} className="mx-auto text-ink-soft" aria-hidden />
         <h2 className="mt-3 text-lg font-bold">{item ? 'Prototype section' : 'Nothing here'}</h2>
         <p className="mt-2 text-ink-soft">

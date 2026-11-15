@@ -52,7 +52,7 @@ export default function ClubProfile() {
         <ArrowLeft size={16} aria-hidden /> All organizations
       </Link>
 
-      <header className="overflow-hidden rounded border border-line">
+      <header className="overflow-hidden rounded-md border border-line">
         <div className="relative h-24 sm:h-28">
           <PatternCover color={club.color} variant={club.cover} className="absolute inset-0 h-full w-full" />
         </div>
@@ -235,7 +235,7 @@ export default function ClubProfile() {
             </p>
           </div>
 
-          <div className="flex gap-2 rounded border border-[#b3d7ee] bg-[#eef6fb] p-4 text-sm text-ink">
+          <div className="flex gap-2 rounded-md border border-[#b3d7ee] bg-[#eef6fb] p-4 text-sm text-ink">
             <Info size={18} aria-hidden className="mt-0.5 shrink-0 text-link" />
             <p>
               Following adds this club's meetings to My Campus Life. It does <strong>not</strong> make you a verified

@@ -55,7 +55,7 @@ export default function Following() {
         }
       />
 
-      <div className="mb-6 flex gap-2 rounded border border-[#b3d7ee] bg-[#eef6fb] p-3 text-sm text-ink">
+      <div className="mb-6 flex gap-2 rounded-md border border-[#b3d7ee] bg-[#eef6fb] p-3 text-sm text-ink">
         <Info size={18} aria-hidden className="mt-0.5 shrink-0 text-link" />
         <p>Following a club is not the same as being a verified member. It only adds the club's activity to your feed.</p>
       </div>
@@ -65,7 +65,7 @@ export default function Following() {
           <h2 id="followed-heading" className="section-title">
             Followed clubs
           </h2>
-          <ul className="divide-y divide-line-soft rounded border border-line">
+          <ul className="divide-y divide-line-soft rounded-md border border-line">
             {clubs.map((club) => {
               const next = nextMeeting(club);
               return (
@@ -109,7 +109,7 @@ export default function Following() {
               {upcoming.map((item) => {
                 const event = item.eventId ? EVENT_BY_ID[item.eventId] : undefined;
                 return (
-                  <li key={item.id} className="flex gap-3 rounded border border-line p-3">
+                  <li key={item.id} className="flex gap-3 rounded-md border border-line p-3">
                     <span
                       className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
                       style={{ background: event ? '#e8f5ee' : '#f8ecec', color: event ? '#0a7a44' : '#881c1c' }}

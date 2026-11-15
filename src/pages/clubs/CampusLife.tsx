@@ -233,7 +233,7 @@ function ItemDialog({ item, pool, onClose }: { item: ScheduleItem | null; pool: 
       onClose={onClose}
       onClick={(e) => e.target === ref.current && ref.current?.close()}
       aria-labelledby={item ? 'item-dialog-title' : undefined}
-      className="m-auto w-[calc(100%-2rem)] max-w-lg rounded border border-line bg-white p-0 text-ink shadow-xl backdrop:bg-black/40"
+      className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-md border border-line bg-white p-0 text-ink shadow-xl backdrop:bg-black/40"
     >
       {item && meta && Icon && (
         <div className="p-5">
@@ -287,7 +287,7 @@ function ItemDialog({ item, pool, onClose }: { item: ScheduleItem | null; pool: 
               This is a due time, not a block of time, so it is never counted as a schedule conflict.
             </p>
           ) : overlaps.length ? (
-            <div className="mt-4 rounded border border-warn/40 bg-warn-soft p-3 text-sm" role="note">
+            <div className="mt-4 rounded-md border border-warn/40 bg-warn-soft p-3 text-sm" role="note">
               <p className="flex items-center gap-1.5 font-bold text-warn">
                 <TriangleAlert size={16} aria-hidden />
                 {kind === 'clubEvent' ? 'Would overlap if you attend' : 'Schedule conflict'}
@@ -400,7 +400,7 @@ export default function CampusLife() {
         <h2 className="text-lg font-bold" aria-live="polite">
           {title}
         </h2>
-        <div className="ml-auto inline-flex overflow-hidden rounded border border-line" role="group" aria-label="Calendar view">
+        <div className="ml-auto inline-flex overflow-hidden rounded-md border border-line" role="group" aria-label="Calendar view">
           {VIEWS.map(([v, label, Icon]) => (
             <button
               key={v}
@@ -429,7 +429,7 @@ export default function CampusLife() {
               aria-pressed={shown[k]}
               onClick={() => setShown((s) => ({ ...s, [k]: !s[k] }))}
               className={cx(
-                'flex items-center gap-3 rounded border p-3 text-left transition-colors',
+                'flex items-center gap-3 rounded-md border p-3 text-left transition-colors',
                 shown[k] ? 'bg-white' : 'border-dashed border-line bg-surface opacity-60',
               )}
               style={shown[k] ? { borderColor: meta.color, borderStyle: meta.dashed ? 'dashed' : 'solid', boxShadow: `inset 4px 0 0 ${meta.color}` } : undefined}
@@ -445,7 +445,7 @@ export default function CampusLife() {
             </button>
           );
         })}
-        <div className={cx('flex items-center gap-3 rounded border p-3', pairs.length ? 'border-warn bg-warn-soft' : 'border-line bg-white')}>
+        <div className={cx('flex items-center gap-3 rounded-md border p-3', pairs.length ? 'border-warn bg-warn-soft' : 'border-line bg-white')}>
           <span
             className={cx('grid h-9 w-9 shrink-0 place-items-center rounded-full', pairs.length ? 'bg-white text-warn' : 'bg-[#e8f5ee] text-success')}
           >
@@ -464,7 +464,7 @@ export default function CampusLife() {
       </p>
 
       {pairs.length > 0 && (
-        <section aria-labelledby="overlaps-heading" className="mb-6 rounded border border-warn/40 bg-warn-soft p-4">
+        <section aria-labelledby="overlaps-heading" className="mb-6 rounded-md border border-warn/40 bg-warn-soft p-4">
           <h2 id="overlaps-heading" className="flex items-center gap-2 font-bold text-warn">
             <TriangleAlert size={18} aria-hidden /> Schedule overlaps
           </h2>
@@ -489,7 +489,7 @@ export default function CampusLife() {
       )}
 
       {view === 'month' && (
-        <div className="overflow-hidden rounded border border-line">
+        <div className="overflow-hidden rounded-md border border-line">
           <div className="grid grid-cols-7 border-b border-line bg-surface">
             {DOW_SHORT.map((d) => (
               <div key={d} className="px-1 py-1.5 text-center text-xs font-bold uppercase tracking-wide text-ink-soft">
@@ -574,7 +574,7 @@ export default function CampusLife() {
 
       {view === 'week' && wide && (
         <div className="overflow-x-auto">
-          <div className="grid min-w-[760px] grid-cols-7 gap-px overflow-hidden rounded border border-line bg-line">
+          <div className="grid min-w-[760px] grid-cols-7 gap-px overflow-hidden rounded-md border border-line bg-line">
             {days.map((d) => {
               const dayItems = forDay(d);
               const isToday = isSameDay(d, now);

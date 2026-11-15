@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { AppShell } from './components/AppShell';
 import { NAV_ITEMS } from './nav';
 import Dashboard from './pages/Dashboard';
@@ -28,7 +29,8 @@ const CampaignPage = lazy(() => import('./pages/clubs/clubfund/CampaignPage'));
 
 function Loading() {
   return (
-    <p role="status" aria-live="polite" className="px-6 py-10 text-sm text-ink-soft md:px-12">
+    <p role="status" aria-live="polite" className="flex items-center gap-2 px-6 py-10 text-sm text-ink-soft md:px-12">
+      <Loader2 size={16} aria-hidden className="animate-spin motion-reduce:animate-none" />
       Loading…
     </p>
   );

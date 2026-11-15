@@ -160,7 +160,7 @@ export default function CampaignPage() {
             {history.length ? (
               <ContributionList items={history} />
             ) : (
-              <p className="rounded border border-dashed border-line p-4 text-sm text-ink-soft">No verified contributions yet.</p>
+              <p className="rounded-md border border-dashed border-line bg-surface/50 p-4 text-sm text-ink-soft">No verified contributions yet.</p>
             )}
             <p className="mt-2 text-xs text-ink-soft">
               Only transactions ClubFund verified on Solana Devnet are listed and counted. {PUBLIC_CHAIN_NOTE}
@@ -169,9 +169,9 @@ export default function CampaignPage() {
         </div>
 
         <aside className="space-y-4">
-          <div className="card space-y-3 p-4">
+          <div className="card space-y-3 border-t-4 border-t-success p-4">
             <FundingProgress campaign={campaign} large />
-            <dl className="space-y-1 text-sm">
+            <dl className="space-y-1 border-t border-line-soft pt-3 text-sm">
               <div className="flex flex-wrap justify-between gap-x-2">
                 <dt className="text-ink-soft">Goal</dt>
                 <dd>{formatSol(campaign.goal_lamports)} Devnet SOL</dd>
@@ -183,11 +183,11 @@ export default function CampaignPage() {
                 </dd>
               </div>
             </dl>
-            <div className="text-sm">
+            <div className="border-t border-line-soft pt-3 text-sm">
               <p className="text-ink-soft">Recipient Devnet wallet</p>
               {campaign.recipient_address ? (
                 <>
-                  <p className="break-all font-mono text-ink" data-testid="cf-campaign-recipient">
+                  <p className="my-1 break-all rounded-md bg-surface px-2 py-1.5 font-mono text-[0.8125rem] leading-snug text-ink" data-testid="cf-campaign-recipient">
                     {campaign.recipient_address}
                   </p>
                   <p className="text-xs text-ink-soft">

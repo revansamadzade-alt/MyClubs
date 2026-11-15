@@ -12,7 +12,7 @@ import { DEMO_ORG } from '../lib/applications';
 export function DemoOrgCard() {
   const club = DEMO_ORG;
   return (
-    <div className="flex flex-col overflow-hidden rounded border border-dashed border-[#9aa5ad] bg-white" aria-labelledby="demo-org-name" data-testid="demo-org-card">
+    <div className="flex flex-col overflow-hidden rounded-md border border-dashed border-[#9aa5ad] bg-white" aria-labelledby="demo-org-name" data-testid="demo-org-card">
       <div className="relative h-16">
         <PatternCover color={club.color} variant={club.cover} className="absolute inset-0 h-full w-full" />
       </div>
@@ -44,7 +44,7 @@ export function ClubCard({ club }: { club: Club }) {
   const schedule = club.meetings.length ? club.meetings.map(meetingLabel).join('; ') : (club.scheduleNote ?? 'Meeting times not listed');
 
   return (
-    <article className="flex flex-col overflow-hidden rounded border border-line bg-white transition-shadow hover:shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
+    <article className="card card-hover flex flex-col overflow-hidden">
       <div className="relative h-16">
         <PatternCover color={club.color} variant={club.cover} className="absolute inset-0 h-full w-full" />
         {following && (

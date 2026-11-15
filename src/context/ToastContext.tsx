@@ -38,7 +38,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="pointer-events-auto flex w-full max-w-md items-stretch overflow-hidden rounded border border-success bg-white text-sm text-ink shadow-lg"
+            className="pointer-events-auto flex w-full max-w-md items-stretch overflow-hidden rounded-md border border-success bg-white text-sm text-ink shadow-lg"
           >
             <span className="grid w-10 shrink-0 place-items-center bg-success text-white">
               <Check size={18} aria-hidden />

@@ -1,0 +1,26 @@
+1: Skip to content | outline solid 2px
+2: UMassAmherst | outline solid 2px
+3: Account | outline solid 2px
+4: Dashboard | outline solid 2px
+5: Courses | outline solid 2px
+6: Groups | outline solid 2px
+7: MyClubs | outline solid 2px
+8: Calendar | outline solid 2px
+9: Inbox | outline solid 2px
+10: History | outline solid 2px
+11: Studio | outline solid 2px
+12: Portfolio | outline solid 2px
+13: 1 unreadHelp | outline solid 2px
+14: Explore Clubs | outline solid 2px
+15: Find My Fit | outline solid 2px
+16: Sign In / Get Started | outline solid 2px
+17: Explore Clubs | outline solid 2px
+18: Find My Fit | outline solid 2px
+19: Campus Events | outline solid 2px
+20: My Campus Life | outline solid 2px
+21: Applications | outline solid 2px
+22: ClubFund | outline solid 2px
+23: Dashboard | outline solid 2px
+24: Get started | outline solid 2px
+25: Sign in to ClubFund | outline solid 2px
+26: Skip to contentUMassAmherstAcc | outline none 3px

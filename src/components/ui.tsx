@@ -99,7 +99,7 @@ export function DateTile({ date, className }: { date: Date; className?: string }
   return (
     <div
       aria-hidden
-      className={cx('flex w-14 shrink-0 flex-col self-start overflow-hidden rounded border border-line bg-white text-center', className)}
+      className={cx('flex w-14 shrink-0 flex-col self-start overflow-hidden rounded-md border border-line bg-white text-center', className)}
     >
       <span className="bg-umass py-0.5 text-[0.6875rem] font-bold uppercase tracking-wider text-white">
         {date.toLocaleDateString('en-US', { month: 'short' })}
@@ -182,11 +182,11 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded border border-dashed border-line px-6 py-12 text-center">
+    <div className="rounded-md border border-dashed border-line bg-surface/50 px-6 py-12 text-center">
       <Icon size={40} strokeWidth={1.4} className="mx-auto text-ink-soft" aria-hidden />
       <h2 className="mt-3 text-lg font-bold text-ink">{title}</h2>
       {children && <p className="mx-auto mt-1.5 max-w-md text-ink-soft">{children}</p>}
-      {action && <div className="mt-5 flex justify-center gap-2">{action}</div>}
+      {action && <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
   );
 }

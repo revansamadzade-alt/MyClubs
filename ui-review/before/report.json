@@ -1,0 +1,8 @@
+{
+  "label": "before",
+  "base": "https://my-clubs-five.vercel.app",
+  "horizontalOverflow": [
+    "mobile-375 applications: page is 433px wide in a 375px viewport"
+  ],
+  "consoleErrors": []
+}

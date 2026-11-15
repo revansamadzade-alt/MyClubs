@@ -18,7 +18,7 @@ export function Notice({ tone = 'info', children, role }: { tone?: 'info' | 'war
   const Icon = tone === 'error' || tone === 'warn' ? CircleAlert : tone === 'success' ? Lock : Info;
   const color = { info: 'text-link', warn: 'text-warn', error: 'text-badge', success: 'text-success' }[tone];
   return (
-    <div role={role} className={cx('flex gap-2 rounded border p-3 text-sm text-ink', styles)}>
+    <div role={role} className={cx('flex gap-2 rounded-md border p-3 text-sm text-ink', styles)}>
       <Icon size={18} aria-hidden className={cx('mt-0.5 shrink-0', color)} />
       <div className="min-w-0">{children}</div>
     </div>

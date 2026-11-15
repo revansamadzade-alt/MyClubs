@@ -58,7 +58,7 @@ export default function ApplyForm() {
 function Notice({ club }: { club: Club }) {
   if (isDemoOrg(club))
     return (
-      <div role="note" className="mb-5 flex gap-2 rounded border border-warn/40 bg-warn-soft p-4 text-sm text-ink">
+      <div role="note" className="mb-5 flex gap-2 rounded-md border border-warn/40 bg-warn-soft p-4 text-sm text-ink">
         <Info size={18} aria-hidden className="mt-0.5 shrink-0 text-warn" />
         <div>
           <p className="font-bold text-warn">Demo only — not sent to the organization.</p>
@@ -69,7 +69,7 @@ function Notice({ club }: { club: Club }) {
   const a = club.application!;
   const closed = applicationsClosed(club);
   return (
-    <div role="note" className="mb-5 flex gap-2 rounded border border-[#b3d7ee] bg-[#eef6fb] p-4 text-sm text-ink">
+    <div role="note" className="mb-5 flex gap-2 rounded-md border border-[#b3d7ee] bg-[#eef6fb] p-4 text-sm text-ink">
       <Info size={18} aria-hidden className="mt-0.5 shrink-0 text-link" />
       <div className="min-w-0">
         <p className="font-bold">Sample application questions — not {club.name}'s official application.</p>
@@ -458,7 +458,7 @@ function Wizard({ club }: { club: Club }) {
       <Notice club={club} />
 
       {save === 'conflict' && (
-        <div role="alert" className="mb-5 rounded border border-badge/40 bg-[#fdeeee] p-4 text-sm text-ink" data-testid="conflict">
+        <div role="alert" className="mb-5 rounded-md border border-badge/40 bg-[#fdeeee] p-4 text-sm text-ink" data-testid="conflict">
           <p className="flex items-center gap-2 font-bold text-badge">
             <TriangleAlert size={18} aria-hidden /> This application was changed in another tab.
           </p>
@@ -527,7 +527,7 @@ function Wizard({ club }: { club: Club }) {
             </button>
           )}
           {errorCount > 0 && (
-            <p role="alert" className="mt-3 rounded border border-badge/40 bg-[#fdeeee] p-3 text-sm font-bold text-badge">
+            <p role="alert" className="mt-3 rounded-md border border-badge/40 bg-[#fdeeee] p-3 text-sm font-bold text-badge">
               {errorCount === 1 ? '1 answer needs attention.' : `${errorCount} answers need attention.`}
             </p>
           )}

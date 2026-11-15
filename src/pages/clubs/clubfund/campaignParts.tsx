@@ -19,7 +19,7 @@ export const PUBLIC_CHAIN_NOTE =
 /** The required Devnet demo label. */
 export function DevnetNotice({ className }: { className?: string }) {
   return (
-    <div role="note" className={cx('flex gap-2 rounded border border-warn/40 bg-warn-soft p-3 text-sm font-bold text-ink', className)} data-testid="cf-devnet-label">
+    <div role="note" className={cx('flex gap-2 rounded-md border border-warn/40 bg-warn-soft p-3 text-sm font-bold text-ink', className)} data-testid="cf-devnet-label">
       <FlaskConical size={18} aria-hidden className="mt-0.5 shrink-0 text-warn" />
       <p>{DEVNET_LABEL}</p>
     </div>
@@ -67,15 +67,15 @@ export function CampaignStatus({ campaign }: { campaign: Campaign }) {
   if (campaign.status === 'paused') return <span className="text-sm text-warn">Paused: not accepting contributions</span>;
   if (!acceptsContributions(campaign)) return <span className="text-sm text-ink-soft">Not open yet: recipient wallet awaiting confirmation</span>;
   return (
-    <span className="inline-flex items-center gap-1 text-sm text-success">
-      <BadgeCheck size={15} aria-hidden /> Open for Devnet contributions
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#e7f5ee] px-2 py-0.5 text-[0.8125rem] font-bold text-success">
+      <BadgeCheck size={14} aria-hidden /> Open for Devnet contributions
     </span>
   );
 }
 
 export function CampaignCard({ campaign }: { campaign: Campaign }) {
   return (
-    <li className="card flex flex-col p-4" data-testid="cf-campaign">
+    <li className="card card-hover flex flex-col p-4" data-testid="cf-campaign">
       <div className="flex flex-wrap items-center gap-2">
         <CategoryChip category={campaign.category} />
         <SampleBadge label="Devnet demo" />
@@ -118,7 +118,7 @@ export function AddressLink({ address }: { address: string }) {
 /** Verified contributions: amount, time, status, shortened signature and Explorer link. */
 export function ContributionList({ items, showCampaign }: { items: (Contribution & { campaignTitle?: string; campaignSlug?: string })[]; showCampaign?: boolean }) {
   return (
-    <ul className="divide-y divide-line-soft rounded border border-line" data-testid="cf-history">
+    <ul className="divide-y divide-line-soft rounded-md border border-line" data-testid="cf-history">
       {items.map((c) => (
         <li key={c.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 p-3 text-sm">
           <span className="min-w-0">

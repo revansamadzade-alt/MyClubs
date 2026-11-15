@@ -8,3 +8,5 @@ node_modules
 dist
 supabase/.temp
 tests/e2e/output
+# UI review artifacts are not part of the site
+ui-review
