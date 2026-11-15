@@ -19,6 +19,7 @@ const server = await createServer({
 after(() => server.close());
 const P = await server.ssrLoadModule('/supabase/functions/_shared/policy.ts');
 const H = await server.ssrLoadModule('/supabase/functions/_shared/handlers.ts');
+const OTP = await server.ssrLoadModule('/src/lib/clubfund/otp.ts');
 
 const ORIGIN = 'http://localhost:5173';
 const wallet = (seed) => {
@@ -275,4 +276,18 @@ test('wrong-purpose proof: a link signature cannot unlink', async () => {
   const res = await call(d, 'unlink', { method: 'signature', ...first.proof });
   assert.equal(res.body.error.code, 'purpose_mismatch');
   assert.equal(d.store.links.size, 1);
+});
+
+test('email codes: 6 to 10 digits accepted as strings, leading zeros kept, 8-digit codes never shortened', () => {
+  for (const code of ['012345', '00000000', '01234567', '0123456789'])
+    assert.equal(OTP.isCodeLengthValid(code), true, code);
+  for (const code of ['', '01234', '01234567890', '0123456a', '1234 5678'])
+    assert.equal(OTP.isCodeLengthValid(code), false, JSON.stringify(code));
+  assert.equal(OTP.normalizeCode('01234567'), '01234567');
+  assert.equal(typeof OTP.normalizeCode('01234567'), 'string');
+  assert.equal(OTP.normalizeCode('000000'), '000000', 'all zeros stay six characters');
+  assert.equal(OTP.normalizeCode(' 0123 4567 '), '01234567', 'pasted spacing removed');
+  assert.equal(OTP.normalizeCode('0123-4567'), '01234567');
+  assert.equal(OTP.normalizeCode('012345678901'), '0123456789', 'never longer than the 10-digit maximum');
+  assert.equal(OTP.normalizeCode(OTP.normalizeCode('01234567')), '01234567', 'stable when applied again');
 });

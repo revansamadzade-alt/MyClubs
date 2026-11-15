@@ -3,11 +3,12 @@
 import type { AuthError } from '@supabase/supabase-js';
 import { isUmassEmail, normalizeEmail } from '../../../supabase/functions/_shared/policy';
 import { supabase } from './client';
+import { CODE_MAX_LENGTH, CODE_MIN_LENGTH, isCodeLengthValid, normalizeCode } from './otp';
 
 export { isUmassEmail, normalizeEmail };
+export { CODE_MAX_LENGTH, CODE_MIN_LENGTH, isCodeLengthValid, normalizeCode };
 
 export const RESEND_SECONDS = 60;
-export const CODE_LENGTH = 6;
 
 export class AuthProblem extends Error {
   constructor(
@@ -54,8 +55,10 @@ export async function requestCode(rawEmail: string): Promise<string> {
 }
 
 export async function verifyCode(email: string, rawCode: string): Promise<void> {
+  // A string of digits exactly as entered (leading zeros kept). Supabase alone decides if it is right or expired.
   const token = rawCode.replace(/\D/g, '');
-  if (token.length !== CODE_LENGTH) throw new AuthProblem('bad_code', `Enter the ${CODE_LENGTH}-digit code from the email.`);
+  if (!isCodeLengthValid(token))
+    throw new AuthProblem('bad_code', `Enter the verification code from the email (${CODE_MIN_LENGTH} to ${CODE_MAX_LENGTH} digits).`);
   let res;
   try {
     res = await supabase().auth.verifyOtp({ email, token, type: 'email' });

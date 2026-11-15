@@ -1570,7 +1570,7 @@ await section('25 ClubFund', async () => {
         if (mock.otp === 'fail') return call('Fetch.failRequest', { requestId: p.requestId, errorReason: 'InternetDisconnected' });
         if (mock.otp === 429) [status, json] = [429, { code: 'over_email_send_rate_limit', msg: 'For security purposes, you can only request this after 60 seconds.' }];
       } else if (path === '/auth/v1/verify') {
-        if (body?.token === '123456' && body?.email === 'jdoe@umass.edu') json = session();
+        if (body?.token === '01234567' && body?.email === 'jdoe@umass.edu') json = session();
         else [status, json] = [403, { code: 'otp_expired', msg: 'Token has expired or is invalid' }];
       } else if (path === '/auth/v1/user') json = user;
       else if (path === '/auth/v1/token') json = session();
@@ -1674,14 +1674,19 @@ await section('25 ClubFund', async () => {
     await clickT(`byText('main button', 'Send verification code')`);
     await waitT(`$('[data-testid=cf-code]')`);
     const sent = mock.requests.filter((r) => r.path === '/auth/v1/otp').at(-1);
-    check(A, 'code requested for the normalized address', sent?.body?.email === 'jdoe@umass.edu' && (await evT(`return $('main').textContent.includes('We sent a 6-digit code to jdoe@umass.edu')`)));
+    check(A, 'code requested for the normalized address', sent?.body?.email === 'jdoe@umass.edu' && (await evT(`return $('main').textContent.includes('We sent a verification code to jdoe@umass.edu')`)));
     check(A, 'resend waits with a visible countdown', await evT(`const b = $('[data-testid=cf-resend]'); return b.disabled && /Resend code in \\d+ s/.test(b.textContent)`));
-    check(A, 'code input: labelled, numeric, one-time-code autofill', await evT(`const i = $('[data-testid=cf-code]'); return i.closest('label').textContent.includes('6-digit code') && i.inputMode === 'numeric' && i.autocomplete === 'one-time-code'`));
+    check(A, 'code input: labelled, numeric, one-time-code autofill', await evT(`const i = $('[data-testid=cf-code]'); return i.closest('label').textContent.includes('Verification code') && !i.closest('label').textContent.includes('6-digit') && i.inputMode === 'numeric' && i.autocomplete === 'one-time-code' && i.maxLength === 10`));
+    await evT(`typeInto($('[data-testid=cf-code]'), '01234'); return true`);
+    check(A, 'code shorter than 6 digits cannot be submitted', await evT(`return byText('main form button[type=submit]', 'Verify').disabled`));
     await evT(`typeInto($('[data-testid=cf-code]'), '000000'); return true`);
     await clickT(`byText('main form button[type=submit]', 'Verify')`);
     check(A, 'wrong or expired code: announced error, no session', (await waitT(`$('main [role=alert]')?.textContent.includes('wrong or has expired')`)) && !(await evT(`return !!localStorage.getItem('myclubs-clubfund-auth')`)));
-    await evT(`typeInto($('[data-testid=cf-code]'), '123456'); return true`);
+    check(A, 'wrong 6-digit code sent as the exact string (leading zeros kept)', mock.requests.filter((r) => r.path === '/auth/v1/verify').at(-1)?.body?.token === '000000');
+    await evT(`typeInto($('[data-testid=cf-code]'), '0123 4567'); return true`);
+    check(A, '8-digit code with a leading zero is kept whole (pasted spacing removed)', await evT(`return $('[data-testid=cf-code]').value === '01234567' && !byText('main form button[type=submit]', 'Verify').disabled`));
     await clickT(`byText('main form button[type=submit]', 'Verify')`);
+    check(A, '8-digit code sent to Supabase unchanged, as a string', mock.requests.filter((r) => r.path === '/auth/v1/verify').at(-1)?.body?.token === '01234567');
     check(A, 'correct code: session and wallet step', await waitT(`$('main').textContent.includes('UMass email verified: jdoe@umass.edu') && $('main').textContent.includes('Connect your Solana wallet')`));
     await go('/clubs/clubfund');
     check(A, 'session restored after refresh', await waitT(`$('main').textContent.includes('UMass email verified: jdoe@umass.edu')`));

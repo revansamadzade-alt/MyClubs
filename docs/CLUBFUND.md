@@ -86,8 +86,8 @@ Nothing below has been done yet. Do not paste secrets into chat.
 2. **Edge Function secret**: Dashboard → Edge Functions → Secrets → `CLUBFUND_ALLOWED_ORIGINS` =
    `http://localhost:5173,http://localhost:4173,<your deployed origin>`.
 3. **Auth hook**: Authentication → Hooks → *Before User Created* → Postgres → `public.hook_before_user_created_umass_only`.
-4. **Email sign-in**: Authentication → Providers → Email: enabled, *Confirm email* on, OTP length 6, short OTP expiry
-   (e.g. 600 s).
+4. **Email sign-in**: Authentication → Providers → Email: enabled, *Confirm email* on, short OTP expiry (e.g. 600 s).
+   Any OTP length from 6 to 10 digits works; the app sends the code to Supabase exactly as entered.
 5. **Email templates**: Authentication → Email Templates → *Magic Link* and *Confirm signup*: include the code, e.g.
    `Your ClubFund code is {{ .Token }}. It expires soon. If you didn't request it, ignore this email.`
 6. **SMTP (required for real students)**: Supabase's built-in email only delivers to project team members and is

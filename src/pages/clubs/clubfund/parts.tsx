@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { CircleAlert, Info, Loader2, Lock, Wallet as WalletIcon } from 'lucide-react';
-import { AuthProblem, CODE_LENGTH, RESEND_SECONDS, requestCode, verifyCode } from '../../../lib/clubfund/auth';
+import { AuthProblem, CODE_MAX_LENGTH, RESEND_SECONDS, isCodeLengthValid, normalizeCode, requestCode, verifyCode } from '../../../lib/clubfund/auth';
 import type { Wallet } from '../../../lib/clubfund/wallets';
 import { WalletProblem } from '../../../lib/clubfund/wallets';
 import { cx } from '../../../lib/cx';
@@ -179,27 +179,30 @@ export function EmailVerification({ fixedEmail, onVerified, submitLabel = 'Verif
       aria-label="Enter your verification code"
     >
       <p className="text-sm text-ink" role="status">
-        We sent a {CODE_LENGTH}-digit code to <strong>{pending.email}</strong>. It expires after a short time.
+        We sent a verification code to <strong>{pending.email}</strong>. It expires after a short time.
       </p>
       <label className="mt-3 block">
-        <span className="mb-1 block text-sm font-bold text-ink">{CODE_LENGTH}-digit code</span>
+        <span className="mb-1 block text-sm font-bold text-ink">Verification code</span>
         <input
           ref={codeRef}
           inputMode="numeric"
           autoComplete="one-time-code"
           pattern="[0-9]*"
-          maxLength={CODE_LENGTH}
+          maxLength={CODE_MAX_LENGTH}
           value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
+          onChange={(e) => setCode(normalizeCode(e.target.value))}
           aria-invalid={error?.code === 'bad_code' || undefined}
-          aria-describedby={error ? errorId : undefined}
-          className="input w-40 text-center font-mono text-lg tracking-[0.3em]"
+          aria-describedby={error ? `${id}-code-help ${errorId}` : `${id}-code-help`}
+          className="input w-full max-w-[14rem] text-center font-mono text-lg tracking-[0.25em]"
           data-testid="cf-code"
         />
+        <span id={`${id}-code-help`} className="mt-1 block text-xs text-ink-soft">
+          Enter all the digits from the email.
+        </span>
       </label>
       {errorBox}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="submit" className="btn btn-primary" disabled={code.length !== CODE_LENGTH || busy === 'verify'}>
+        <button type="submit" className="btn btn-primary" disabled={!isCodeLengthValid(code) || busy === 'verify'}>
           {busy === 'verify' ? 'Verifying…' : submitLabel}
         </button>
         <button type="button" className="btn btn-secondary" disabled={wait > 0 || busy === 'send'} onClick={() => void send(pending.email)} data-testid="cf-resend">
