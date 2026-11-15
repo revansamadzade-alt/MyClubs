@@ -1,20 +1,56 @@
 # MyClubs — HackUMass XIV demo readiness
 
-Branch `fix/demo-readiness` (local, **not pushed**), on top of `master` = `origin/master` = `166a133`.
-Supabase project `zanhvwuvuvfxetqkojbw`. Checked on 2026-11-15.
+**Live site: https://my-clubs-five.vercel.app** (Vercel project `revan19/my-clubs`, production branch `master`).
+Deployed commit `c874cad` (master = origin/master). Supabase project `zanhvwuvuvfxetqkojbw`. Checked on 2026-11-15.
 
 ## Real transaction status
 
-- **Real wallet link: done.** 2026-11-15 08:06:58–08:07:02 UTC. `wallet-challenge` returned 200, then `wallet-link`
-  returned 200. The server checked the challenge, compared the exact signed bytes and verified the Ed25519 signature
-  before storing the link. Linked wallet: the account active in Phantom at the time, `71sn…KuWz` (Devnet, on the
-  owner's @umass.edu account). The app links whichever account is selected and verified in Phantom; no wallet address
-  is hard-coded.
-- **Real Devnet contribution: not yet.** The linked wallet has 0 Devnet SOL (checked 2026-11-15); it needs the faucet
+- **Real wallet link: done.** 2026-11-15 08:06:58–08:07:02 UTC on localhost. `wallet-challenge` returned 200, then
+  `wallet-link` returned 200. The server compared the exact signed bytes and verified the Ed25519 signature before
+  storing the link. Linked wallet: the account selected in Phantom, `71sn…KuWz`. The app links whichever account is
+  selected and verified in Phantom; no wallet address is hard-coded.
+- **Real Devnet contribution: not yet.** The linked wallet had 0 Devnet SOL (checked 2026-11-15) and needs the faucet
   first.
-- Earlier unfinished attempts (02:58–02:59 and 07:07 UTC) stopped inside Phantom: "the chain ID does not match the
-  provided chain ID for verification". The challenge carried the optional SIWS `Chain ID` line, which Phantom
-  compares with its own network. That line was removed in `c8034d2` (deployed 08:08 UTC).
+- **Auth hook:** status not readable with the tools available here (reading the stored Supabase credential was blocked); check it in the dashboard.
+- **Not yet done on the production domain:** a real email sign-in and a wallet signature, both of which need your inbox
+  and Phantom.
+- Earlier unfinished attempts (02:58–02:59 and 07:07 UTC) stopped inside Phantom because of the SIWS `Chain ID` line.
+  It was removed in `c8034d2`.
+
+## Production (Vercel), 2026-11-15
+
+- **Vercel project:** `revan19/my-clubs`, connected to GitHub. `master` deploys to Production; other branches get Preview
+  deployments. Framework Vite, build `npm run build` (the tested data snapshot), output `dist`, SPA rewrite.
+- **Deployment:** `dpl_3EeQMQwHYmQQx8jBSu2Cg4nR47Ks` from `c874cad`, built in 17 s.
+  - Aliases: `https://my-clubs-five.vercel.app`, `https://my-clubs-revan19.vercel.app`,
+    `https://my-clubs-git-master-revan19.vercel.app`.
+- **Vercel Production env:**
+  - `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` were added from `.env.local`; values were never printed.
+  - No secret goes into a `VITE_` variable.
+  - The project also has Supabase integration variables from an earlier setup (`SUPABASE_SECRET_KEY`,
+    `SUPABASE_SERVICE_ROLE_KEY`, `POSTGRES_*`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_JWT_SECRET`). A Vite build
+    exposes only `VITE_` variables, so these never reach the browser and are unused. Remove them in Vercel if you
+    don't need them.
+- **Supabase `CLUBFUND_ALLOWED_ORIGINS`:**
+  `https://my-clubs-five.vercel.app,https://my-clubs-revan19.vercel.app,http://localhost:5173,http://localhost:4173`.
+  - All four functions answer the preflight from both production aliases and localhost (204 with the matching origin).
+  - Foreign sites and the per-branch alias are refused (403, no CORS grant).
+  - Functions are ACTIVE, version 4: the secret change redeployed the same v3 bundle; the code hash is unchanged and
+    `verify_jwt` is true.
+- **Live checks:**
+  - Every important route returns 200 on direct load and refresh.
+  - The production smoke test passed 36/36 on desktop and a 375 px phone: homepage at `/`, Dashboard at
+    `/dashboard`, Discover, a profile, Find My Fit, Events, Campus Life, Applications, ClubFund with 6 live campaigns
+    (1 open), the campaign page with its recipient and Devnet Explorer link, wallet settings, the event entry point,
+    and 404 plus refresh.
+  - No console errors and no failed requests.
+  - The full browser suite against the live URL: **480/480**, 0 console issues (`MYCLUBS_BASE_URL=https://my-clubs-five.vercel.app npm run test:e2e`; the ClubFund section uses its local mocked backend).
+- **Still to do in the Supabase dashboard** (no CLI or tool here can read or set these without risking the working
+  SMTP settings):
+  - Authentication → URL Configuration: set **Site URL** to `https://my-clubs-five.vercel.app` and add Redirect URLs
+    `https://my-clubs-five.vercel.app/**` and `http://localhost:5173/**`. The email-code sign-in doesn't use
+    redirects, but emails link to the Site URL.
+  - Authentication → Hooks: enable **Before User Created** → Postgres → `public.hook_before_user_created_umass_only`.
 
 ## Deployed 2026-11-15 (all approved)
 
@@ -70,6 +106,10 @@ Supabase project `zanhvwuvuvfxetqkojbw`. Checked on 2026-11-15.
 | Real wallet / real Devnet transaction | live | **not run** (needs your approvals in Phantom) |
 | Full clean rerun on production builds (all sections, after both fixes) | mocked browser | **458/458**, 0 console issues |
 | Full run on production builds after the Phantom chain ID fix (`c8034d2`) | mocked browser | **464/464**, 0 console issues |
+| Full suite after the homepage change (`c874cad`): dev server, production builds | mocked browser | **480/480** each, 0 console issues |
+| Full suite against the live site https://my-clubs-five.vercel.app | live site, mocked ClubFund backend | **480/480**, 0 console issues |
+| Production smoke test (live site + live Supabase), desktop and 375 px phone | live, read-only | **36/36**, no console errors, no failed requests |
+| Production-origin probes: auth settings, CORS, functions with no login | live, read-only | auth reachable with CORS; all four functions 401 with no login; foreign origins refused |
 
 `/verify` (gstack-checks): typecheck PASS and build PASS. Tests show UNMAPPED, because the tool reads its source-to-test
 map (`.gstack/pregate.json`, added on this branch) only from `origin/master`.
@@ -88,13 +128,10 @@ map (`.gstack/pregate.json`, added on this branch) only from `origin/master`.
 
 ## Still blocked (needs you)
 
-1. **The real Devnet contribution.** Fund the linked wallet at the faucet, then contribute 0.01 SOL (checklist below).
-2. **Enable the Auth hook:** Dashboard → Authentication → Hooks → *Before User Created* → Postgres → schema `public`
-   → `hook_before_user_created_umass_only`. The read-only check found no problem with the function.
-3. **Vercel:**
-   - Push `fix/demo-readiness` and merge into `master`.
-   - Import or redeploy the project in Vercel with the env vars below.
-   - Then send the production URL so `CLUBFUND_ALLOWED_ORIGINS` can be set (approval needed).
+1. **The real Devnet contribution.** Fund the linked wallet at the faucet, then contribute 0.01 SOL on the live site
+   (checklist below).
+2. **A real email sign-in on the production domain**, to confirm email codes work there (needs your inbox).
+3. **Supabase dashboard:** set the Site URL and Redirect URLs, and enable the Auth hook (see "Production").
 
 ## Security status
 
@@ -164,15 +201,15 @@ map (`.gstack/pregate.json`, added on this branch) only from `origin/master`.
    - Verify your email and confirm the linked wallet shows.
    - Confirm the function logs have no `origin_not_allowed` for the production URL.
 
-## Five-minute final checklist (real Phantom test)
+## Five-minute final checklist (real Phantom test on the live site)
 
-1. In Phantom: unlock it, select the account you will contribute from (the linked `71sn…KuWz`; never the recipient
-   `6Q5t…P8gV`), Settings → Developer Settings → Testnet Mode on → **Solana Devnet**.
-2. Open `http://localhost:5173/clubs/clubfund` (or the production URL once allowed). Verify your UMass email if asked.
-   The page shows "Wallet linked" with `71sn…KuWz`.
+1. In Phantom: unlock it, select the account you'll contribute from (the linked `71sn…KuWz`; never the recipient
+   `6Q5t…P8gV`), then Settings → Developer Settings → Testnet Mode on → **Solana Devnet**.
+2. Open **https://my-clubs-five.vercel.app/clubs/clubfund** and verify your UMass email with the emailed code. The page
+   shows "Wallet linked" with `71sn…KuWz`. (Localhost works the same way at `http://localhost:5173/clubs/clubfund`.)
    - To use a different account instead: Wallet settings → connect the linked account → **Sign and unlink**. Then
-     select the new account in Phantom, reconnect, and **Sign verification message**. The page always shows the full
-     address it will link.
+     select the new account in Phantom, reconnect, and **Sign verification message**. The page shows the full address
+     it will link.
 3. Get Devnet SOL at https://faucet.solana.com for the linked address, then click the refresh icon next to the balance.
 4. Open "Demo Club: Equipment & Supplies" → **Support This Campaign** → `0.01` → Review → tick →
    **Approve in wallet**. In Phantom, check the recipient `6Q5t…P8gV` and 0.01 SOL, then approve once.
