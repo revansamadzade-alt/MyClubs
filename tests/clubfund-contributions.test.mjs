@@ -225,12 +225,19 @@ function memoryStore() {
     [USERS['bob-token'].id, { user_id: USERS['bob-token'].id, wallet_address: BOB.address, chain: 'solana:devnet', linked_at: '', verified_at: '' }],
   ]);
   const rows = new Map();
+  const rate = new Map();
   let seq = 0;
   return {
     campaigns,
     rows,
+    rate,
     async getLink(id) {
       return links.get(id) ?? null;
+    },
+    async takeRateToken(userId, action, limit) {
+      const used = rate.get(userId + action) ?? 0;
+      if (used >= limit) throw new H.StoreError('rate_limited', 321);
+      rate.set(userId + action, used + 1);
     },
     async getCampaign(id) {
       const c = campaigns.get(id);
@@ -391,4 +398,22 @@ test('contribute endpoint: duplicates, other students, wrong recipients, amounts
   devnet.down = false;
   assert.equal((await post({ campaignId: EQUIPMENT, signature: fresh.signature, lamports: 10_000_000 })).status, 201, 'works once Devnet is back');
   assert.equal(store.campaigns.get(EQUIPMENT).raised_lamports, 60_000_000, 'only the two verified transfers count');
+});
+
+test('contribute endpoint: per-student limit on Devnet checks; counted re-checks are free; limit shows the wait', async () => {
+  const { post, onChain, store, devnet } = setup();
+  const c = onChain(realTransfer(ALICE, RECIPIENT, 10_000_000, 'demo-club-equipment'));
+  assert.equal((await post({ campaignId: EQUIPMENT, signature: c.signature, lamports: 10_000_000 })).status, 201);
+  assert.equal(store.rate.get(USERS['alice-token'].id + 'contribute'), 1, 'one Devnet check counted');
+  for (let i = 0; i < 5; i++) assert.equal((await post({ campaignId: EQUIPMENT, signature: c.signature, lamports: 10_000_000 })).status, 200);
+  assert.equal(store.rate.get(USERS['alice-token'].id + 'contribute'), 1, 'already-counted re-checks do not touch Devnet or the limit');
+  const unseen = newSig();
+  for (let i = 1; i < C.CONTRIBUTE_RATE.limit; i++) assert.equal((await post({ campaignId: EQUIPMENT, signature: unseen, lamports: 10_000_000 })).code, 'tx_not_found');
+  const calls = devnet.calls;
+  const limited = await post({ campaignId: EQUIPMENT, signature: unseen, lamports: 10_000_000 });
+  assert.deepEqual([limited.status, limited.code, limited.body.error.retryAfterSeconds], [429, 'verify_rate_limited', 321]);
+  assert.equal(devnet.calls, calls, 'no Devnet request once limited');
+  assert.equal((await post({ campaignId: EQUIPMENT, signature: unseen, lamports: 10_000_000 }, 'bob-token')).code, 'tx_not_found', 'limits are per student');
+  assert.equal(C.CONTRIBUTE_RATE.limit, 20);
+  assert.equal(C.CONTRIBUTE_RATE.windowSeconds, 600);
 });

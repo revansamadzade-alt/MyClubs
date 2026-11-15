@@ -30,13 +30,31 @@ export interface LinkRow {
 }
 
 /** Thrown by Store methods with a known database error code (raised by the SQL functions). */
-export class StoreError extends Error {}
+export class StoreError extends Error {
+  constructor(
+    code: string,
+    /** For rate_limited: seconds until the next request is allowed. */
+    public retryAfter?: number,
+  ) {
+    super(code);
+  }
+}
 
 export interface Store {
   getLink(userId: string): Promise<LinkRow | null>;
   getLinkByWallet(wallet: string): Promise<LinkRow | null>;
-  /** Throws StoreError('rate_limited') when the user requested too many challenges. */
-  issueChallenge(a: { userId: string; wallet: string; purpose: WalletPurpose; nonce: string; message: string; ttlSeconds: number }): Promise<{ id: string; expires_at: string }>;
+  /**
+   * Returns the user's still-open challenge for this wallet and purpose (`reused`), or stores a new one with this
+   * nonce and message. Throws StoreError('rate_limited', retryAfter) when too many new challenges were requested.
+   */
+  issueChallenge(a: {
+    userId: string;
+    wallet: string;
+    purpose: WalletPurpose;
+    nonce: string;
+    message: string;
+    ttlSeconds: number;
+  }): Promise<{ id: string; expires_at: string; message?: string; reused?: boolean }>;
   getChallenge(id: string): Promise<StoredChallenge | null>;
   /** Atomically consumes the challenge and stores the link. Throws StoreError('challenge_invalid' | 'already_linked' | 'wallet_in_use'). */
   linkWallet(a: { challengeId: string; userId: string; wallet: string; message: string }): Promise<LinkRow>;
@@ -69,7 +87,8 @@ const MESSAGES: Record<string, string> = {
   wallet_in_use: 'This wallet is already linked to another MyClubs account.',
   not_linked: 'Your account has no linked wallet.',
   not_linked_wallet: 'Connect the wallet that is linked to your account to unlink it.',
-  rate_limited: 'Too many verification requests. Wait a few minutes and try again.',
+  rate_limited: 'Too many wallet verification requests. Wait a few minutes and try again.',
+  verify_rate_limited: 'Too many contribution checks. Wait a few minutes, then check again.',
   challenge_not_found: 'That verification request was not found. Start again.',
   wallet_mismatch: 'The signature came from a different wallet than the one being linked.',
   purpose_mismatch: 'That signature was made for a different action. Start again.',
@@ -109,6 +128,7 @@ const STATUS: Record<string, number> = {
   not_linked: 404,
   not_linked_wallet: 409,
   rate_limited: 429,
+  verify_rate_limited: 429,
   challenge_not_found: 404,
   wallet_mismatch: 400,
   purpose_mismatch: 400,
@@ -134,6 +154,34 @@ const STATUS: Record<string, number> = {
   wrong_network: 500,
 };
 
+export const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:5173', 'http://localhost:4173'];
+
+/**
+ * Parses CLUBFUND_ALLOWED_ORIGINS: a comma-separated list of exact origins (scheme://host[:port]), e.g.
+ * "https://myclubs.vercel.app,http://localhost:5173". Wildcards, paths and non-http(s) schemes are rejected (never
+ * "allow every site"). When the variable is unset or has no valid entry, local development origins are used.
+ */
+export function parseAllowedOrigins(raw: string | undefined | null): { origins: string[]; rejected: string[]; usingDefaults: boolean } {
+  const origins: string[] = [];
+  const rejected: string[] = [];
+  for (const part of (raw ?? '').split(',').map((s) => s.trim()).filter(Boolean)) {
+    let ok: string | null = null;
+    if (!part.includes('*')) {
+      try {
+        const u = new URL(part);
+        const bare = part.replace(/\/$/, '');
+        if ((u.protocol === 'https:' || u.protocol === 'http:') && !u.username && !u.password && u.origin === bare.toLowerCase()) ok = u.origin;
+      } catch {
+        ok = null;
+      }
+    }
+    if (ok) {
+      if (!origins.includes(ok)) origins.push(ok);
+    } else rejected.push(part);
+  }
+  return origins.length ? { origins, rejected, usingDefaults: false } : { origins: [...DEFAULT_ALLOWED_ORIGINS], rejected, usingDefaults: true };
+}
+
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function corsHeaders(origin: string | null, allowed: string[]): Record<string, string> {
@@ -150,7 +198,17 @@ function corsHeaders(origin: string | null, allowed: string[]): Record<string, s
 export function json(body: unknown, status: number, cors: Record<string, string>): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
-export const fail = (code: string, cors: Record<string, string>) => json({ error: { code, message: MESSAGES[code] ?? MESSAGES.server_error } }, STATUS[code] ?? 500, cors);
+export const fail = (code: string, cors: Record<string, string>, retryAfter?: number) => {
+  const wait = retryAfter && Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : undefined;
+  const res = json({ error: { code, message: MESSAGES[code] ?? MESSAGES.server_error, ...(wait ? { retryAfterSeconds: wait } : {}) } }, STATUS[code] ?? 500, cors);
+  if (wait) res.headers.set('Retry-After', String(wait));
+  return res;
+};
+/** The error response for a failed store call (keeps the retry time of a rate limit). */
+export const failStore = (e: unknown, cors: Record<string, string>, rename: Record<string, string> = {}) => {
+  const code = storeCode(e);
+  return fail(rename[code] ?? code, cors, e instanceof StoreError ? e.retryAfter : undefined);
+};
 
 async function readJson(req: Request): Promise<Record<string, unknown> | null> {
   const len = Number(req.headers.get('content-length') ?? 0);
@@ -182,7 +240,11 @@ export async function guard(req: Request, deps: Pick<Deps, 'authenticate' | 'all
   const origin = req.headers.get('origin');
   const cors = corsHeaders(origin, deps.allowedOrigins);
   // Browsers always send Origin on cross-origin requests; refuse sites that are not on the allow list.
-  if (origin && !deps.allowedOrigins.includes(origin)) return fail('origin_not_allowed', cors);
+  if (origin && !deps.allowedOrigins.includes(origin)) {
+    // Visible in the Edge Function logs: the exact origin to add to CLUBFUND_ALLOWED_ORIGINS if it is a real deployment.
+    console.warn(`origin_not_allowed: ${origin} is not in CLUBFUND_ALLOWED_ORIGINS`);
+    return fail('origin_not_allowed', cors);
+  }
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (req.method !== 'POST') return fail('method_not_allowed', cors);
 
@@ -207,7 +269,7 @@ export async function handle(endpoint: Endpoint, req: Request, deps: Deps): Prom
     if (endpoint === 'link') return await link(body, user, deps, cors);
     return await unlink(body, user, deps, cors);
   } catch (e) {
-    return fail(storeCode(e), cors);
+    return failStore(e, cors);
   }
 }
 
@@ -239,7 +301,8 @@ async function challenge(body: Record<string, unknown>, user: AuthedUser, deps: 
   const nonce = deps.randomNonce();
   const message = buildChallengeMessage({ domain: new URL(appOrigin).host, uri: appOrigin, address: wallet, userId: user.id, purpose, nonce, issuedAt, expiresAt });
   const issued = await deps.store.issueChallenge({ userId: user.id, wallet, purpose, nonce, message, ttlSeconds: CHALLENGE_TTL_SECONDS });
-  return json({ challengeId: issued.id, message, expiresAt: issued.expires_at }, 200, cors);
+  // A reused challenge keeps its original text: those are the exact bytes the wallet must sign.
+  return json({ challengeId: issued.id, message: issued.message ?? message, expiresAt: issued.expires_at, reused: issued.reused === true }, 200, cors);
 }
 
 function readProof(body: Record<string, unknown>) {

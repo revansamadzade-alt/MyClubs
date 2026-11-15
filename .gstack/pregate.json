@@ -1,0 +1,10 @@
+{
+  "$schema": "https://github.com/garrytan/gstack/docs/pregate.md#pregate-v1",
+  "runner": "node --test {files}",
+  "dependencies": {
+    "supabase/functions/_shared/**": ["tests/clubfund.test.mjs", "tests/clubfund-contributions.test.mjs", "tests/clubfund-rpc.test.mjs"],
+    "supabase/migrations/**": ["tests/clubfund-db.test.mjs", "tests/clubfund-campaigns-db.test.mjs", "tests/clubfund-limits-db.test.mjs"],
+    "src/lib/clubfund/**": ["tests/clubfund.test.mjs", "tests/clubfund-contributions.test.mjs", "tests/clubfund-rpc.test.mjs"],
+    "package.json": ["tests/unit.test.mjs", "tests/feeds.test.mjs", "tests/clubfund.test.mjs"]
+  }
+}

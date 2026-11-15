@@ -16,8 +16,26 @@ export class RpcProblem extends Error {
 }
 
 const UNAVAILABLE = "Can't reach Solana Devnet right now. Check your connection and try again.";
+const RATE_LIMITED = 'Solana Devnet is rate-limiting requests. Wait a moment and try again.';
 
-async function rpc<T>(method: string, params: unknown[], timeoutMs = 12_000): Promise<T> {
+/** Read-only methods: safe to repeat and to share between callers. sendTransaction is never repeated. */
+const READS = new Set(['getGenesisHash', 'getBalance', 'getLatestBlockhash', 'getFeeForMessage', 'getMinimumBalanceForRentExemption', 'getBlockHeight', 'getSignatureStatuses']);
+const READ_ATTEMPTS = 3;
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Exponential backoff with jitter; honours the server's Retry-After (capped so the page stays responsive). */
+const backoff = (attempt: number, retryAfterMs?: number) => Math.min(retryAfterMs ?? 400 * 2 ** attempt + Math.random() * 300, 5_000);
+
+class Retryable extends RpcProblem {
+  constructor(
+    message: string,
+    public retryAfterMs?: number,
+  ) {
+    super('unavailable', message);
+  }
+}
+
+async function once<T>(method: string, params: unknown[], timeoutMs: number): Promise<T> {
   let res: Response;
   try {
     res = await fetch(RPC_URL, {
@@ -27,18 +45,55 @@ async function rpc<T>(method: string, params: unknown[], timeoutMs = 12_000): Pr
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
-    throw new RpcProblem('unavailable', UNAVAILABLE);
+    throw new Retryable(UNAVAILABLE);
   }
-  if (!res.ok) throw new RpcProblem('unavailable', res.status === 429 ? 'Solana Devnet is rate-limiting requests. Wait a moment and try again.' : UNAVAILABLE);
-  let body: { result?: T; error?: { message?: string } };
+  if (res.status === 429) {
+    const s = Number(res.headers.get('retry-after'));
+    throw new Retryable(RATE_LIMITED, Number.isFinite(s) && s > 0 ? s * 1000 : undefined);
+  }
+  if (!res.ok) throw new Retryable(UNAVAILABLE);
+  let body: { result?: T; error?: { code?: number; message?: string } };
   try {
     body = await res.json();
   } catch {
-    throw new RpcProblem('unavailable', UNAVAILABLE);
+    throw new Retryable(UNAVAILABLE);
   }
-  if (body.error) throw new RpcProblem('rejected', body.error.message ?? 'Solana Devnet refused the request.');
+  if (body.error) {
+    // JSON-RPC level rate limit / node behind: nothing was processed.
+    if (body.error.code === 429 || body.error.code === -32429 || body.error.code === -32005) throw new Retryable(RATE_LIMITED);
+    throw new RpcProblem('rejected', body.error.message ?? 'Solana Devnet refused the request.');
+  }
   return body.result as T;
 }
+
+const inflight = new Map<string, Promise<unknown>>();
+
+async function rpc<T>(method: string, params: unknown[], timeoutMs = 12_000): Promise<T> {
+  if (!READS.has(method)) return once<T>(method, params, timeoutMs);
+  // Identical reads in flight (several components asking for the same balance) share one request.
+  const key = `${method}:${JSON.stringify(params)}`;
+  const shared = inflight.get(key);
+  if (shared) return shared as Promise<T>;
+  const p = (async () => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await once<T>(method, params, timeoutMs);
+      } catch (e) {
+        if (!(e instanceof Retryable) || attempt >= READ_ATTEMPTS - 1) throw e instanceof Retryable ? new RpcProblem('unavailable', e.message) : e;
+        await wait(backoff(attempt, e.retryAfterMs));
+      }
+    }
+  })();
+  inflight.set(key, p);
+  try {
+    return await p;
+  } finally {
+    inflight.delete(key);
+  }
+}
+
+/** Test hook: the endpoint this build talks to. */
+export const devnetRpcUrl = () => RPC_URL;
 
 let devnetOk: Promise<void> | null = null;
 
@@ -136,7 +191,8 @@ export async function waitForConfirmation(
     } catch {
       if (++errors >= 6) return 'unknown';
     }
-    await sleep(intervalMs);
+    // Slow down while Devnet is erroring or rate-limiting (each read already retried a few times).
+    await sleep(errors ? Math.min(intervalMs * 2 ** errors, 10_000) : intervalMs);
   }
   return 'unknown';
 }

@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc -p supabase/functions/tsconfig.json",
-    "test": "node --test tests/unit.test.mjs tests/feeds.test.mjs tests/clubfund.test.mjs tests/clubfund-db.test.mjs tests/clubfund-contributions.test.mjs tests/clubfund-campaigns-db.test.mjs",
+    "test": "node --test tests/unit.test.mjs tests/feeds.test.mjs tests/clubfund.test.mjs tests/clubfund-db.test.mjs tests/clubfund-contributions.test.mjs tests/clubfund-campaigns-db.test.mjs tests/clubfund-limits-db.test.mjs tests/clubfund-rpc.test.mjs",
     "test:e2e": "node tests/e2e/qa.mjs",
     "sync:data": "node scripts/sync-data.mjs",
     "build:fresh": "node scripts/build-fresh.mjs",

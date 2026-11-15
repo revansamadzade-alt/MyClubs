@@ -2,7 +2,7 @@
 // treats that only as a pointer. It fetches the transaction from Solana Devnet itself, checks it against the
 // authenticated user's verified wallet and the campaign's confirmed recipient, and only then records it. Environment
 // specifics (auth server, database, Devnet RPC) are injected so the same code runs in Deno and in the Node tests.
-import { UUID, fail, guard, json, storeCode, type Deps, type LinkRow } from './handlers.ts';
+import { UUID, fail, failStore, guard, json, type Deps, type LinkRow } from './handlers.ts';
 import {
   DEVNET_GENESIS_HASH,
   MAX_CONTRIBUTION_LAMPORTS,
@@ -42,8 +42,13 @@ export interface Recorded {
   contribution_count: number;
 }
 
+/** Verification checks allowed per student: each one reads Solana Devnet several times. */
+export const CONTRIBUTE_RATE = { limit: 20, windowSeconds: 600 };
+
 export interface ContributionStore {
   getLink(userId: string): Promise<LinkRow | null>;
+  /** Counts one verification check; throws StoreError('rate_limited', retryAfter) when over the limit. */
+  takeRateToken(userId: string, action: 'contribute', limit: number, windowSeconds: number): Promise<void>;
   getCampaign(id: string): Promise<CampaignRow | null>;
   /** The already-recorded contribution with this signature (and who recorded it), if any. */
   findContribution(signature: string): Promise<(ContributionRow & { user_id: string | null }) | null>;
@@ -117,6 +122,9 @@ export async function handleContribution(req: Request, deps: ContributionDeps): 
       );
     }
 
+    // Only checks that will read Devnet count against the per-student limit (re-checks of counted ones are free).
+    await deps.store.takeRateToken(user.id, 'contribute', CONTRIBUTE_RATE.limit, CONTRIBUTE_RATE.windowSeconds);
+
     let status: SignatureStatus | null;
     let tx: ParsedTransaction | null;
     try {
@@ -152,6 +160,6 @@ export async function handleContribution(req: Request, deps: ContributionDeps): 
       cors,
     );
   } catch (e) {
-    return fail(storeCode(e), cors);
+    return failStore(e, cors, { rate_limited: 'verify_rate_limited' });
   }
 }

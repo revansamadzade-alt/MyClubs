@@ -47,12 +47,24 @@ function memoryStore() {
     async getLink(userId) { return links.get(userId) ?? null; },
     async getLinkByWallet(w) { return [...links.values()].find((l) => l.wallet_address === w) ?? null; },
     async issueChallenge(a) {
-      const recent = [...challenges.values()].filter((c) => c.user_id === a.userId).length;
-      if (recent >= 5) throw new H.StoreError('rate_limited');
+      // Mirrors clubfund_request_challenge: an open challenge (same user, wallet, purpose and site, > 60 s left) is
+      // handed back; otherwise at most 5 new ones per user in 10 minutes.
+      const line = (m, n) => m.split('\n')[n - 1];
+      const open = [...challenges.values()]
+        .filter((c) => c.user_id === a.userId && c.wallet_address === a.wallet && c.purpose === a.purpose && !c.consumed_at)
+        .filter((c) => new Date(c.expires_at).getTime() > clock.now.getTime() + 60_000)
+        .filter((c) => line(c.message, 1) === line(a.message, 1) && line(c.message, 6) === line(a.message, 6))
+        .at(-1);
+      if (open) return { id: open.id, expires_at: open.expires_at, message: open.message, reused: true };
+      const recent = [...challenges.values()].filter((c) => c.user_id === a.userId && new Date(c.issued_at).getTime() > clock.now.getTime() - 600_000);
+      if (recent.length >= 5) {
+        const oldest = Math.min(...recent.slice(-5).map((c) => new Date(c.issued_at).getTime()));
+        throw new H.StoreError('rate_limited', Math.max(1, Math.ceil((oldest + 600_000 - clock.now.getTime()) / 1000)));
+      }
       const id = `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`;
       const expires_at = new Date(clock.now.getTime() + a.ttlSeconds * 1000).toISOString();
-      challenges.set(id, { id, user_id: a.userId, wallet_address: a.wallet, purpose: a.purpose, message: a.message, expires_at, consumed_at: null });
-      return { id, expires_at };
+      challenges.set(id, { id, user_id: a.userId, wallet_address: a.wallet, purpose: a.purpose, message: a.message, issued_at: clock.now.toISOString(), expires_at, consumed_at: null });
+      return { id, expires_at, message: a.message, reused: false };
     },
     async getChallenge(id) { const c = challenges.get(id); return c ? { ...c } : null; },
     async linkWallet(a) {
@@ -226,14 +238,63 @@ test('cross-origin: unknown sites are refused; allowed origin gets CORS headers;
   assert.equal((await call(d, 'challenge', {}, 'alice-token', ORIGIN, 'GET')).status, 405);
 });
 
-test('challenge requests are rate limited and validate input', async () => {
+test('challenge requests validate input', async () => {
   const d = deps();
   assert.equal((await call(d, 'challenge', { wallet: 'not-a-wallet', purpose: 'link' })).body.error.code, 'invalid_wallet');
   assert.equal((await call(d, 'challenge', { wallet: ALICE_WALLET.address, purpose: 'drain' })).body.error.code, 'bad_request');
-  for (let i = 0; i < 5; i++) assert.equal((await call(d, 'challenge', { wallet: ALICE_WALLET.address, purpose: 'link' })).status, 200);
-  const limited = await call(d, 'challenge', { wallet: ALICE_WALLET.address, purpose: 'link' });
+});
+
+test('regression: retrying after a cancelled or failed signature reuses the open challenge instead of burning the limit', async () => {
+  const d = deps();
+  const first = await call(d, 'challenge', { wallet: ALICE_WALLET.address, purpose: 'link' });
+  assert.equal(first.body.reused, false);
+  // The live failure: five retries (cancelled/failed wallet popups) minted five challenges and locked the student out.
+  for (let i = 0; i < 8; i++) {
+    const again = await call(d, 'challenge', { wallet: ALICE_WALLET.address, purpose: 'link' });
+    assert.equal(again.status, 200, `retry ${i + 1}`);
+    assert.equal(again.body.reused, true);
+    assert.equal(again.body.challengeId, first.body.challengeId);
+    assert.equal(again.body.message, first.body.message, 'the same exact bytes to sign');
+  }
+  assert.equal(d.store.challenges.size, 1);
+  // The reused challenge is still single-use: once linked it cannot be replayed.
+  const proof = { challengeId: first.body.challengeId, wallet: ALICE_WALLET.address, ...sign(ALICE_WALLET, first.body.message) };
+  assert.equal((await call(d, 'link', proof)).status, 200);
+  assert.equal((await call(d, 'link', proof)).body.error.code, 'challenge_used');
+});
+
+test('challenge reuse stops near expiry, for other wallets or purposes, and for other sites', async () => {
+  const d = deps();
+  const a = await call(d, 'challenge', { wallet: ALICE_WALLET.address, purpose: 'link' });
+  const saved = clock.now;
+  clock.now = new Date(saved.getTime() + 250_000); // 50 s left: too little to sign comfortably
+  const late = await call(d, 'challenge', { wallet: ALICE_WALLET.address, purpose: 'link' });
+  assert.equal(late.body.reused, false);
+  assert.notEqual(late.body.challengeId, a.body.challengeId);
+  clock.now = saved;
+  const otherWallet = await call(d, 'challenge', { wallet: BOB_WALLET.address, purpose: 'link' });
+  assert.equal(otherWallet.body.reused, false);
+  d.allowedOrigins.push('https://myclubs.example');
+  const otherSite = await call(d, 'challenge', { wallet: ALICE_WALLET.address, purpose: 'link' }, 'alice-token', 'https://myclubs.example');
+  assert.equal(otherSite.body.reused, false, 'a challenge shows the requesting site, so another site gets its own');
+  assert.match(otherSite.body.message, /^myclubs\.example wants you/);
+});
+
+test('new challenges are still limited to 5 per 10 minutes, with the time until the next one', async () => {
+  const d = deps();
+  const extra = [3, 4, 5, 6, 7].map((seed) => wallet(seed));
+  for (const w of extra) assert.equal((await call(d, 'challenge', { wallet: w.address, purpose: 'link' })).status, 200);
+  const limited = await call(d, 'challenge', { wallet: wallet(8).address, purpose: 'link' });
   assert.equal(limited.status, 429);
   assert.equal(limited.body.error.code, 'rate_limited');
+  assert.equal(limited.body.error.retryAfterSeconds, 600);
+  assert.equal(limited.headers.get('retry-after'), '600');
+  // Open challenges are still handed back while new ones are limited.
+  assert.equal((await call(d, 'challenge', { wallet: extra[0].address, purpose: 'link' })).body.reused, true);
+  const saved = clock.now;
+  clock.now = new Date(saved.getTime() + 601_000);
+  assert.equal((await call(d, 'challenge', { wallet: wallet(8).address, purpose: 'link' })).status, 200, 'allowed again after the window');
+  clock.now = saved;
 });
 
 test('unlink with the linked wallet\'s signature; a different wallet cannot unlink', async () => {
@@ -290,4 +351,17 @@ test('email codes: 6 to 10 digits accepted as strings, leading zeros kept, 8-dig
   assert.equal(OTP.normalizeCode('0123-4567'), '01234567');
   assert.equal(OTP.normalizeCode('012345678901'), '0123456789', 'never longer than the 10-digit maximum');
   assert.equal(OTP.normalizeCode(OTP.normalizeCode('01234567')), '01234567', 'stable when applied again');
+});
+
+test('allowed origins: exact origins only, never wildcards; local defaults when unset or invalid', () => {
+  assert.deepEqual(H.parseAllowedOrigins(undefined), { origins: H.DEFAULT_ALLOWED_ORIGINS, rejected: [], usingDefaults: true });
+  const r = H.parseAllowedOrigins(
+    ' https://myclubs.vercel.app/ , http://localhost:5173,HTTPS://MyClubs-git-main-team.vercel.app,https://*.vercel.app,*,https://x.com/path,ftp://a.b,javascript:alert(1),https://user:pw@x.com,https://myclubs.vercel.app',
+  );
+  assert.deepEqual(r.origins, ['https://myclubs.vercel.app', 'http://localhost:5173', 'https://myclubs-git-main-team.vercel.app']);
+  assert.deepEqual(r.rejected, ['https://*.vercel.app', '*', 'https://x.com/path', 'ftp://a.b', 'javascript:alert(1)', 'https://user:pw@x.com']);
+  assert.equal(r.usingDefaults, false);
+  const onlyBad = H.parseAllowedOrigins('*, https://*.vercel.app');
+  assert.equal(onlyBad.usingDefaults, true, 'a wildcard never means "all sites": only local development stays allowed');
+  assert.deepEqual(onlyBad.origins, H.DEFAULT_ALLOWED_ORIGINS);
 });

@@ -130,3 +130,57 @@ export function verifyContribution(
     confirmation: status.confirmationStatus,
   };
 }
+
+// --- JSON-RPC reads with bounded retries -------------------------------------------------------------------------------
+
+export class RpcError extends Error {
+  constructor(
+    message: string,
+    public retryable: boolean,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * One read-only JSON-RPC call with bounded retries: timeouts, network errors, HTTP 429/5xx and JSON-RPC rate-limit
+ * errors are retried with jittered exponential backoff (honouring Retry-After, capped); other errors fail at once.
+ * Only for reads: a transaction is never re-sent by this helper.
+ */
+export async function rpcRead<T>(
+  fetchFn: typeof fetch,
+  url: string,
+  method: string,
+  params: unknown[],
+  opts: { attempts?: number; timeoutMs?: number; sleep?: (ms: number) => Promise<void>; random?: () => number; maxDelayMs?: number } = {},
+): Promise<T> {
+  const attempts = opts.attempts ?? 3;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const random = opts.random ?? Math.random;
+  for (let i = 0; ; i++) {
+    let retryAfterMs: number | undefined;
+    try {
+      const res = await fetchFn(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 8_000),
+      });
+      if (res.ok) {
+        const out = (await res.json()) as { result?: T; error?: { code?: number; message?: string } };
+        if (!out.error) return out.result as T;
+        if (out.error.code !== 429 && out.error.code !== -32429 && out.error.code !== -32005) throw new RpcError(out.error.message ?? 'RPC error', false);
+      } else if (res.status !== 429 && res.status < 500) {
+        throw new RpcError(`RPC HTTP ${res.status}`, false);
+      } else {
+        const s = Number(res.headers.get('retry-after'));
+        if (Number.isFinite(s) && s > 0) retryAfterMs = s * 1000;
+      }
+    } catch (e) {
+      if (e instanceof RpcError && !e.retryable) throw e;
+      // network error or timeout: retry
+    }
+    if (i >= attempts - 1) throw new RpcError(`${method}: Solana Devnet did not answer after ${attempts} attempts`, true);
+    await sleep(Math.min(retryAfterMs ?? 300 * 2 ** i + random() * 200, opts.maxDelayMs ?? 2_000));
+  }
+}

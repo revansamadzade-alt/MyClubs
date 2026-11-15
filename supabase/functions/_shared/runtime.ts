@@ -3,12 +3,10 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.119.0';
 import { ed25519 } from 'npm:@noble/curves@2.4.0/ed25519.js';
 import { base58 } from 'npm:@scure/base@2.4.0';
-import { StoreError, type AuthedUser, type Deps, type LinkRow, type Store } from './handlers.ts';
+import { StoreError, parseAllowedOrigins, type AuthedUser, type Deps, type LinkRow, type Store } from './handlers.ts';
 import type { CampaignRow, ContributionDeps, ContributionRow, ContributionStore, DevnetReader, Recorded } from './contribute.ts';
 import type { StoredChallenge } from './policy.ts';
-import { DEFAULT_DEVNET_RPC_URL, type ParsedTransaction, type SignatureStatus } from './solana.ts';
-
-const DEFAULT_ORIGINS = ['http://localhost:5173', 'http://localhost:4173'];
+import { DEFAULT_DEVNET_RPC_URL, rpcRead, type ParsedTransaction, type SignatureStatus } from './solana.ts';
 
 function env(name: string): string {
   const v = Deno.env.get(name);
@@ -38,6 +36,7 @@ function claims(token: string): Record<string, unknown> {
 }
 
 const KNOWN = [
+  'invalid_ttl',
   'rate_limited',
   'challenge_invalid',
   'already_linked',
@@ -48,10 +47,14 @@ const KNOWN = [
   'wrong_recipient',
   'not_linked',
 ];
-function raise(error: { message?: string } | null): never {
+function raise(error: { message?: string; details?: string | null } | null): never {
   const code = KNOWN.find((c) => error?.message?.includes(c));
-  throw new StoreError(code ?? 'server_error');
+  const retryAfter = code === 'rate_limited' ? Number(error?.details) : undefined;
+  throw new StoreError(code ?? 'server_error', retryAfter && Number.isFinite(retryAfter) ? retryAfter : undefined);
 }
+
+/** PostgREST "function not found": the newer SQL function isn't applied yet (see the migrations). */
+const missingFunction = (error: { code?: string } | null) => error?.code === 'PGRST202' || error?.code === '42883';
 
 function store(db: SupabaseClient): Store {
   return {
@@ -66,16 +69,15 @@ function store(db: SupabaseClient): Store {
       return data as LinkRow | null;
     },
     async issueChallenge(a) {
-      const { data, error } = await db.rpc('clubfund_issue_challenge', {
-        p_user: a.userId,
-        p_wallet: a.wallet,
-        p_purpose: a.purpose,
-        p_nonce: a.nonce,
-        p_message: a.message,
-        p_ttl_seconds: a.ttlSeconds,
-      });
+      const args = { p_user: a.userId, p_wallet: a.wallet, p_purpose: a.purpose, p_nonce: a.nonce, p_message: a.message, p_ttl_seconds: a.ttlSeconds };
+      let { data, error } = await db.rpc('clubfund_request_challenge', args);
+      if (missingFunction(error)) {
+        // Database not migrated yet: the original function (always a new challenge) still works.
+        console.warn('clubfund_request_challenge is missing; apply 20261115090000_clubfund_challenge_reuse_and_rate_limits.sql');
+        ({ data, error } = await db.rpc('clubfund_issue_challenge', args));
+      }
       if (error) raise(error);
-      const row = (Array.isArray(data) ? data[0] : data) as { id: string; expires_at: string } | undefined;
+      const row = (Array.isArray(data) ? data[0] : data) as { id: string; expires_at: string; message?: string; reused?: boolean } | undefined;
       if (!row) raise(null);
       return row;
     },
@@ -110,6 +112,14 @@ function contributionStore(db: SupabaseClient): ContributionStore {
   const links = store(db);
   return {
     getLink: links.getLink,
+    async takeRateToken(userId, action, limit, windowSeconds) {
+      const { error } = await db.rpc('clubfund_take_rate_token', { p_user: userId, p_action: action, p_limit: limit, p_window_seconds: windowSeconds });
+      if (missingFunction(error)) {
+        console.warn('clubfund_take_rate_token is missing; apply 20261115090000_clubfund_challenge_reuse_and_rate_limits.sql');
+        return;
+      }
+      if (error) raise(error);
+    },
     async getCampaign(id) {
       const { data, error } = await db
         .from('campaigns')
@@ -153,18 +163,8 @@ function contributionStore(db: SupabaseClient): ContributionStore {
 function devnetReader(): DevnetReader {
   const url = Deno.env.get('SOLANA_DEVNET_RPC_URL') || DEFAULT_DEVNET_RPC_URL;
   let genesis: string | null = null;
-  const rpc = async <T>(method: string, params: unknown[]): Promise<T> => {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) throw new Error(`RPC HTTP ${res.status}`);
-    const out = (await res.json()) as { result?: T; error?: { message?: string } };
-    if (out.error) throw new Error(out.error.message ?? 'RPC error');
-    return out.result as T;
-  };
+  // Reads only, with bounded retries and backoff (the server never sends transactions).
+  const rpc = <T>(method: string, params: unknown[]) => rpcRead<T>(fetch, url, method, params, { attempts: 3, timeoutMs: 8_000 });
   return {
     async genesisHash() {
       genesis ??= await rpc<string>('getGenesisHash', []);
@@ -185,10 +185,9 @@ function sharedDeps() {
   if (shared) return shared;
   // Service role stays inside the function; it is only used with ids taken from the verified session.
   const db = createClient(env('SUPABASE_URL'), secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
-  const allowed = (Deno.env.get('CLUBFUND_ALLOWED_ORIGINS') ?? '')
-    .split(',')
-    .map((s) => s.trim().replace(/\/$/, ''))
-    .filter(Boolean);
+  const allowed = parseAllowedOrigins(Deno.env.get('CLUBFUND_ALLOWED_ORIGINS'));
+  if (allowed.rejected.length) console.warn(`CLUBFUND_ALLOWED_ORIGINS: ignored invalid entries ${JSON.stringify(allowed.rejected)} (use exact origins like https://myclubs.vercel.app)`);
+  if (allowed.usingDefaults) console.warn('CLUBFUND_ALLOWED_ORIGINS is not set: only local development origins are allowed');
   shared = {
     db,
     base: {
@@ -199,7 +198,7 @@ function sharedDeps() {
         if (error || !data.user) return null;
         return { id: data.user.id, email: data.user.email ?? null, emailConfirmedAt: data.user.email_confirmed_at ?? null, amr: claims(token).amr };
       },
-      allowedOrigins: allowed.length ? allowed : DEFAULT_ORIGINS,
+      allowedOrigins: allowed.origins,
     },
   };
   return shared;
