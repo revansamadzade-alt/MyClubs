@@ -201,6 +201,7 @@ $$;
 
 -- 5. Function privileges ----------------------------------------------------------------------------------------------
 
+grant usage on schema public to supabase_auth_admin;
 revoke all on function public.hook_before_user_created_umass_only(jsonb) from public, anon, authenticated;
 grant execute on function public.hook_before_user_created_umass_only(jsonb) to supabase_auth_admin;
 grant execute on function public.is_umass_email(text) to supabase_auth_admin, authenticated, service_role;

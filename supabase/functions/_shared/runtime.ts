@@ -14,6 +14,17 @@ function env(name: string): string {
   return v;
 }
 
+/** The project's secret key (new `sb_secret_` keys first; the legacy service_role key stops working at the end of 2026). */
+function secretKey(): string {
+  try {
+    const keys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}') as Record<string, unknown>;
+    if (typeof keys.default === 'string' && keys.default) return keys.default;
+  } catch {
+    // Not set or not JSON: fall back to the legacy key below.
+  }
+  return env('SUPABASE_SERVICE_ROLE_KEY');
+}
+
 /** Decodes a JWT payload that the auth server has already validated (used only to read the "amr" claim). */
 function claims(token: string): Record<string, unknown> {
   try {
@@ -88,7 +99,7 @@ let cached: Deps | null = null;
 export function runtimeDeps(): Deps {
   if (cached) return cached;
   // Service role stays inside the function; it is only used with ids taken from the verified session.
-  const db = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false, autoRefreshToken: false } });
+  const db = createClient(env('SUPABASE_URL'), secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
   const allowed = (Deno.env.get('CLUBFUND_ALLOWED_ORIGINS') ?? '')
     .split(',')
     .map((s) => s.trim().replace(/\/$/, ''))
