@@ -208,3 +208,45 @@ accessibility and 375 px layout.
 
 Not tested automatically: real email delivery, a real Phantom signature or transaction, the deployed Edge Functions, a
 live Devnet transaction, and the hook in the live project. Those are the manual test above.
+
+## Hardening on `fix/demo-readiness` (2026-11-15) — migration and redeploy pending approval
+
+**Wallet-verification lockout ("Too many verification requests").** Every signing attempt used to mint a new
+challenge, so cancelled, failed or stuck Phantom signatures used up the 5-per-10-minutes limit. Live data showed five
+link challenges in 64 s for one wallet, none consumed and no `wallet-link` call. Fixed in two layers:
+
+- Browser (works with the currently deployed functions): the open challenge is kept for the tab and reused across
+  retries and reloads; double clicks send one request; "Stop waiting" when the wallet popup never answers; the wallet's
+  own error text is shown; a rate limit shows a countdown and disables the button; switching wallet accounts mid-signature
+  cancels the attempt; an expired challenge is discarded and the next attempt gets a fresh one.
+- Server (needs the migration + redeploy): `clubfund_request_challenge` hands back the open challenge for the same
+  account, wallet, purpose and site (more than 60 s left) instead of creating a new one, and reports the seconds until
+  the limit lifts (`retryAfterSeconds`, `Retry-After`). The limit on new challenges is unchanged.
+
+**Contribution checks** are limited per student (20 Devnet verification checks per 10 minutes, stored in
+`clubfund_rate_events`, service role only). Re-checks of already-counted signatures are free. A rate-limited or failed
+check keeps the contribution saved with "Check again"; nothing is ever re-sent.
+
+**Recovery by signature.** On a campaign page, "Contribution didn't finish? Check a transaction" takes a transaction
+signature (from the wallet's activity or Explorer). The amount is read from Devnet and the server verifies everything
+(sender = the student's verified wallet, recipient, memo, confirmation, counted once), so an unrelated signature cannot
+be claimed.
+
+**Devnet RPC** reads retry with jittered backoff and honour `Retry-After`; identical browser reads share one request;
+confirmation polling slows down while Devnet errors. `sendTransaction` is never repeated.
+
+**Pending deployment** (in this order; both additive and backward compatible):
+
+1. `npx supabase@2.122.0 db push --linked` → applies `20261115090000_clubfund_challenge_reuse_and_rate_limits.sql`.
+2. `npx supabase@2.122.0 functions deploy wallet-challenge wallet-link wallet-unlink campaign-contribute --project-ref zanhvwuvuvfxetqkojbw --use-api`.
+
+Until step 1 the redeployed functions fall back to the original challenge function (and skip the contribution rate
+limit, as today). Rollback: redeploy the previous commit's functions; the new SQL objects can stay (unused) or be dropped
+with `drop function public.clubfund_request_challenge(uuid,text,text,text,text,integer); drop function
+public.clubfund_take_rate_token(uuid,text,integer,integer); drop table public.clubfund_rate_events;`.
+
+**Recipient wallets.** `npm run clubfund:recipients` (or `npm run clubfund:recipients check <address> -- --contributor <wallet>`) lists which campaigns can take contributions and why not.
+`node scripts/clubfund-recipient.mjs check <public address> --campaign demo-club-equipment --contributor <linked wallet>`
+validates a recipient (base58, 32 bytes, on-curve wallet key, not a program, not the contributor, not used by another
+campaign), looks it up on Devnet (read-only) and prints the one-campaign confirmation SQL. It never runs that SQL and
+never asks for a recovery phrase or private key; only the owner can confirm they control the address.

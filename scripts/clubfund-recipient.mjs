@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // ClubFund recipient wallets: read-only checks, then the exact SQL to confirm one (which this script never runs).
 //
-//   node scripts/clubfund-recipient.mjs status
+//   node scripts/clubfund-recipient.mjs status        (or: npm run clubfund:recipients)
 //       Lists every campaign and why it can or cannot take contributions (missing, invalid, unconfirmed recipient…).
 //       Exit code 1 when no campaign is ready.
 //
 //   node scripts/clubfund-recipient.mjs check <public address> [--campaign demo-club-equipment] [--contributor <your linked wallet>]
+//       (or: npm run clubfund:recipients check <public address> -- --contributor <wallet>)
 //       Validates the address (base58, 32 bytes, on-curve wallet key, not a program, not the contributor, not used by
 //       another campaign) and looks it up on Solana Devnet (read-only). Prints the SQL to set and confirm it for the
 //       campaign. Apply that SQL only after you have checked the address yourself.
@@ -62,7 +63,7 @@ async function devnet(e, method, params) {
 }
 
 async function main() {
-  const [cmd, address, ...rest] = process.argv.slice(2);
+  const [cmd = 'status', address, ...rest] = process.argv.slice(2);
   const opt = (name) => {
     const i = rest.indexOf(`--${name}`);
     return i >= 0 ? rest[i + 1] : undefined;

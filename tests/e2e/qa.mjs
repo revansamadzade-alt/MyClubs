@@ -405,6 +405,8 @@ await section('13 Real data', async () => {
   let bad = [];
   for (const id of ids) {
     await goto(`/clubs/discover/${id}`);
+    // 78 back-to-back navigations: occasionally one takes longer than goto's 8 s wait; wait for the profile itself.
+    await waitFor(`!!$('main h1')`, 15000);
     const ok = await ev(`const t = $('main').textContent; const a = $$('main a'); return a.some(x => x.href.startsWith('https://umassamherst.campuslabs.com/engage/')) && !a.some(x => x.href.startsWith('mailto:')) && !/\\d+ members/.test(t) && t.includes('Source: Campus Pulse listing, retrieved')`);
     if (!ok) bad.push(id);
   }

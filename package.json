@@ -14,7 +14,7 @@
     "build:fresh": "node scripts/build-fresh.mjs",
     "check:membership": "node scripts/check-membership.mjs",
     "test:all": "npm run typecheck && npm test && npm run build",
-    "clubfund:recipients": "node scripts/clubfund-recipient.mjs status"
+    "clubfund:recipients": "node scripts/clubfund-recipient.mjs"
   },
   "dependencies": {
     "@scure/base": "^2.4.0",
