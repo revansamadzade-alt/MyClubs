@@ -59,11 +59,28 @@ function About() {
   );
 }
 
+/** Campaign recipient wallets (public), so a student doesn't link a recipient account as their own by mistake. */
+function useRecipientWallets(): Map<string, string> {
+  const [map, setMap] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    let live = true;
+    listCampaigns()
+      .then((list) => live && setMap(new Map(list.filter((c) => c.recipient_address).map((c) => [c.recipient_address!, c.title]))))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  return map;
+}
+
 function LinkWallet() {
   const cf = useClubFund();
   const proof = useWalletProof('link');
+  const recipients = useRecipientWallets();
+  const recipientOf = cf.account ? recipients.get(cf.account.address) : undefined;
   const sign = () => {
-    if (!cf.account) return;
+    if (!cf.account || recipientOf) return;
     void proof.run(cf.account.address, async (p) => {
       const { link } = await submitLink(p);
       cf.setLink(link); // shown only after the server verified the signature and stored the link
@@ -99,8 +116,23 @@ function LinkWallet() {
               {shortAddress(cf.account.address)}
               <span className="sr-only"> (full address {cf.account.address})</span>
             </p>
+            <p className="mt-1 break-all font-mono text-xs text-ink-soft" data-testid="cf-connected-address">
+              {cf.account.address}
+            </p>
+            <p className="mt-1 text-xs text-ink-soft">
+              This is the account that will be linked, and the one your Devnet contributions will come from. To use another, switch accounts in your
+              wallet.
+            </p>
+            {recipientOf && (
+              <div className="mt-3">
+                <Notice tone="warn" role="alert">
+                  This account is the recipient wallet of "{recipientOf}", so it can't be linked as your own. Switch your wallet to the account you
+                  will contribute from (then reconnect if this page doesn't update).
+                </Notice>
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" className="btn btn-primary" onClick={sign} disabled={working || proof.waitSeconds > 0}>
+              <button type="button" className="btn btn-primary" onClick={sign} disabled={working || proof.waitSeconds > 0 || !!recipientOf}>
                 {proofButtonLabel(proof, 'Sign verification message')}
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => void cf.disconnect()} disabled={working}>

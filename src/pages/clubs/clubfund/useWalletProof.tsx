@@ -24,7 +24,8 @@ export function useWalletProof(purpose: WalletPurpose) {
   const [now, setNow] = useState(() => Date.now());
   const attempt = useRef(0);
   const busy = useRef(false);
-  const signingFor = useRef<string | null>(null);
+  /** The account this attempt is for, from the challenge request to the server's answer. */
+  const attemptFor = useRef<string | null>(null);
 
   useEffect(() => {
     if (retryAt <= Date.now()) return;
@@ -40,17 +41,22 @@ export function useWalletProof(purpose: WalletPurpose) {
   const reset = useCallback((message = '') => {
     attempt.current++;
     busy.current = false;
-    signingFor.current = null;
+    attemptFor.current = null;
     setPhase('idle');
     setError(message);
     setDetail('');
   }, []);
 
-  // The wallet switched accounts mid-signature: that signature would be for another address.
+  // The wallet switched accounts during an attempt: its challenge and signature belong to the previous account, so
+  // the attempt is abandoned (any late result is ignored) and the next one starts for the account now shown.
   const address = cf.account?.address ?? null;
   useEffect(() => {
-    if (signingFor.current && signingFor.current !== address)
-      reset('Your wallet switched accounts while signing. Sign again with the account shown here.');
+    if (attemptFor.current && attemptFor.current !== address)
+      reset(
+        address
+          ? 'Your wallet switched accounts, so that request was cancelled. Check the account shown here, then sign again.'
+          : 'Your wallet disconnected, so that request was cancelled.',
+      );
   }, [address, reset]);
 
   const run = useCallback(
@@ -65,6 +71,7 @@ export function useWalletProof(purpose: WalletPurpose) {
       const live = () => mine === attempt.current;
       const w = cf.wallet;
       const account = cf.account;
+      attemptFor.current = wallet;
       setError('');
       setDetail('');
       try {
@@ -72,15 +79,12 @@ export function useWalletProof(purpose: WalletPurpose) {
         const ch = await challengeFor(cf.session.user.id, wallet, purpose);
         if (!live()) return;
         setPhase('signing');
-        signingFor.current = wallet;
         const signed = await signMessage(w, account, new TextEncoder().encode(ch.message));
-        signingFor.current = null;
-        if (!live()) return; // the student stopped waiting; ignore a late signature
+        if (!live()) return; // the student stopped waiting or switched accounts; ignore a late signature
         setPhase('verifying');
         await submit({ challengeId: ch.challengeId, wallet, signedMessage: signed.signedMessage, signature: signed.signature });
         forgetChallenge();
       } catch (e) {
-        signingFor.current = null;
         if (!live()) return;
         if (e instanceof ApiProblem) {
           if (CHALLENGE_SPENT.has(e.code)) forgetChallenge();
@@ -104,6 +108,7 @@ export function useWalletProof(purpose: WalletPurpose) {
       } finally {
         if (live()) {
           busy.current = false;
+          attemptFor.current = null;
           setPhase('idle');
         }
       }

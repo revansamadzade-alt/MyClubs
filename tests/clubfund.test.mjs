@@ -40,12 +40,15 @@ const users = {
 function memoryStore() {
   const links = new Map();
   const challenges = new Map();
+  const recipients = new Set();
   let seq = 0;
   return {
     links,
     challenges,
+    recipients,
     async getLink(userId) { return links.get(userId) ?? null; },
     async getLinkByWallet(w) { return [...links.values()].find((l) => l.wallet_address === w) ?? null; },
+    async isCampaignRecipient(w) { return recipients.has(w); },
     async issueChallenge(a) {
       // Mirrors clubfund_request_challenge: an open challenge (same user, wallet, purpose and site, > 60 s left) is
       // handed back; otherwise at most 5 new ones per user in 10 minutes.
@@ -131,9 +134,43 @@ test('email policy: exact @umass.edu only (case-insensitive), look-alikes and ma
 test('challenge message names app, wallet, account, operation, nonce and validity; no email', () => {
   const m = P.buildChallengeMessage({ domain: 'localhost:5173', uri: ORIGIN, address: ALICE_WALLET.address, userId: users['alice-token'].id, purpose: 'link', nonce: 'n'.repeat(64), issuedAt: new Date('2026-11-14T12:00:00Z'), expiresAt: new Date('2026-11-14T12:05:00Z') });
   assert.equal(m.split('\n')[0], 'localhost:5173 wants you to sign in with your Solana account:');
-  for (const part of [ALICE_WALLET.address, 'Chain ID: devnet', `Nonce: ${'n'.repeat(64)}`, 'Issued At: 2026-11-14T12:00:00.000Z', 'Expiration Time: 2026-11-14T12:05:00.000Z', 'Request ID: link-wallet', `myclubs:account:${users['alice-token'].id}`, 'moves no funds'])
+  for (const part of [ALICE_WALLET.address, `Nonce: ${'n'.repeat(64)}`, 'Issued At: 2026-11-14T12:00:00.000Z', 'Expiration Time: 2026-11-14T12:05:00.000Z', 'Request ID: link-wallet', `myclubs:account:${users['alice-token'].id}`, 'moves no funds'])
     assert.ok(m.includes(part), part);
   assert.equal(m.includes('@'), false, 'no email address in the signed message');
+});
+
+test('regression (live Phantom error): the challenge is valid SIWS text with no Chain ID line', () => {
+  // Phantom refused "as the chain ID does not match the provided chain ID for verification": it checks an SIWS
+  // message's optional Chain ID against its own selected network. The field must be absent.
+  const m = P.buildChallengeMessage({ domain: 'localhost:5173', uri: ORIGIN, address: ALICE_WALLET.address, userId: users['alice-token'].id, purpose: 'link', nonce: 'a1'.repeat(32), issuedAt: new Date('2026-11-15T12:00:00Z'), expiresAt: new Date('2026-11-15T12:05:00Z') });
+  assert.equal(/chain id/i.test(m), false, 'no Chain ID field');
+  // SIWS layout (Phantom sign-in-with-solana ABNF): header, address, blank, statement, blank, then advanced fields in order.
+  const lines = m.split('\n');
+  assert.equal(lines[0], 'localhost:5173 wants you to sign in with your Solana account:');
+  assert.equal(lines[1], ALICE_WALLET.address);
+  assert.equal(lines[2], '');
+  assert.ok(lines[3].length > 0 && !lines[3].includes('\n'));
+  assert.equal(lines[4], '');
+  const fields = lines.slice(5);
+  assert.deepEqual(fields.map((l) => l.split(':')[0]), ['URI', 'Version', 'Nonce', 'Issued At', 'Expiration Time', 'Request ID', 'Resources', '- myclubs']);
+  assert.equal(fields[0], `URI: ${ORIGIN}`);
+  assert.equal(fields[1], 'Version: 1');
+  assert.match(fields[2], /^Nonce: [A-Za-z0-9]{8,}$/, 'alphanumeric nonce, at least 8 characters');
+  const issued = Date.parse(fields[3].slice('Issued At: '.length));
+  const expires = Date.parse(fields[4].slice('Expiration Time: '.length));
+  assert.ok(expires > issued && expires - issued <= 10 * 60_000, "within Phantom's 10-minute window");
+  const unlink = P.buildChallengeMessage({ domain: 'myclubs.example', uri: 'https://myclubs.example', address: ALICE_WALLET.address, userId: 'u', purpose: 'unlink', nonce: 'b2'.repeat(32), issuedAt: new Date(), expiresAt: new Date(Date.now() + 300_000) });
+  assert.equal(/chain id/i.test(unlink), false);
+});
+
+test("a campaign's recipient wallet can't be linked as a student's own wallet", async () => {
+  const d = deps();
+  d.store.recipients.add(BOB_WALLET.address);
+  const res = await call(d, 'challenge', { wallet: BOB_WALLET.address, purpose: 'link' });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.error.code, 'wallet_is_recipient');
+  assert.equal(d.store.challenges.size, 0, 'no challenge issued');
+  assert.equal((await call(d, 'challenge', { wallet: ALICE_WALLET.address, purpose: 'link' })).status, 200, 'the student can link their own account');
 });
 
 test('Ed25519 verification: correct signature passes; forged, wrong key, tampered or malformed inputs fail', () => {

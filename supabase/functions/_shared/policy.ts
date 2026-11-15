@@ -3,7 +3,6 @@
 
 export const CHALLENGE_TTL_SECONDS = 300;
 export const RECENT_SIGN_IN_SECONDS = 600;
-export const SOLANA_CHAIN_ID = 'devnet';
 export type WalletPurpose = 'link' | 'unlink';
 
 /** Lower-cased, trimmed email. */
@@ -45,6 +44,12 @@ export interface ChallengeFields {
  * The exact text the wallet signs, in the Sign-In With Solana message layout so wallets can display it clearly.
  * It names the app, the wallet, the MyClubs account, the operation, a random nonce and the validity window.
  * It contains no email address.
+ *
+ * It deliberately has no "Chain ID" line. That SIWS field is optional, and wallets that recognise the format (Phantom)
+ * compare it with their own currently selected network and refuse to show the request on any difference ("the chain
+ * ID does not match the provided chain ID for verification"). Proving key ownership doesn't depend on a network:
+ * the server verifies the Ed25519 signature over these exact bytes. Devnet is enforced where it matters (links are
+ * stored as solana:devnet; contributions are verified against the Devnet genesis hash).
  */
 export function buildChallengeMessage(c: ChallengeFields): string {
   const statement =
@@ -59,7 +64,6 @@ export function buildChallengeMessage(c: ChallengeFields): string {
     '',
     `URI: ${c.uri}`,
     'Version: 1',
-    `Chain ID: ${SOLANA_CHAIN_ID}`,
     `Nonce: ${c.nonce}`,
     `Issued At: ${c.issuedAt.toISOString()}`,
     `Expiration Time: ${c.expiresAt.toISOString()}`,

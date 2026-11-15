@@ -44,6 +44,8 @@ export async function challengeFor(userId: string, wallet: string, purpose: Wall
     saved.wallet === wallet &&
     saved.purpose === purpose &&
     saved.origin === location.origin &&
+    // Challenges from before 2026-11-15 carried an SIWS "Chain ID" line that Phantom refuses to show.
+    !/\nChain ID:/.test(saved.message) &&
     Date.parse(saved.expiresAt) - now > MIN_REMAINING_MS
   )
     return { challengeId: saved.challengeId, message: saved.message, expiresAt: saved.expiresAt };

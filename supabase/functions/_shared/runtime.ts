@@ -63,6 +63,11 @@ function store(db: SupabaseClient): Store {
       if (error) raise(error);
       return data as LinkRow | null;
     },
+    async isCampaignRecipient(wallet) {
+      const { data, error } = await db.from('campaigns').select('id').eq('recipient_address', wallet).limit(1);
+      if (error) raise(error);
+      return (data ?? []).length > 0;
+    },
     async getLinkByWallet(wallet) {
       const { data, error } = await db.from('wallet_links').select('*').eq('wallet_address', wallet).maybeSingle();
       if (error) raise(error);

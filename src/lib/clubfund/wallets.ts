@@ -73,6 +73,12 @@ function explain(e: unknown, action: 'connect' | 'sign' | 'transaction'): Wallet
           : 'You declined the transaction in your wallet. Nothing was sent.',
       walletSaid(msg),
     );
+  if (/chain id|network|cluster/i.test(msg))
+    return new WalletProblem(
+      'failed',
+      "Your wallet refused because of a network mismatch. In Phantom: Settings → Developer Settings → Testnet Mode on, choose Solana Devnet, then try again.",
+      walletSaid(msg),
+    );
   return new WalletProblem(
     'failed',
     action === 'connect'

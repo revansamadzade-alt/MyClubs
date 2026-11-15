@@ -1561,6 +1561,10 @@ await section('25 ClubFund', async () => {
       await sleep(250);
     }
     const USER_ID = '6f1c2a8e-1111-4c2a-9a3e-2b7f0c9d4e51';
+    // Challenges are built by the real server code (supabase/functions/_shared/policy.ts), exactly as deployed.
+    const policyServer = await (await import('vite')).createServer({ root: appRoot, configFile: false, logLevel: 'silent', appType: 'custom', server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true, include: [] } });
+    const POLICY = await policyServer.ssrLoadModule('/supabase/functions/_shared/policy.ts');
+    await policyServer.close();
     const ADDRESS = 'GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB';
     const nowSec = () => Math.floor(Date.parse(`${TEST_NOW}-05:00`) / 1000);
     const b64url = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -1671,7 +1675,7 @@ await section('25 ClubFund', async () => {
       else if (path === '/functions/v1/wallet-challenge') {
         mock.challenge = {
           challengeId: '0b5d7a8c-2222-4d3e-8f1a-9c0b1d2e3f40',
-          message: `localhost:${CF_PORT} wants you to sign in with your Solana account:\n${body.wallet}\n\nLink this wallet to your MyClubs ClubFund account.\n\nNonce: ${'ab'.repeat(32)}\nRequest ID: ${body.purpose}-wallet`,
+          message: POLICY.buildChallengeMessage({ domain: `localhost:${CF_PORT}`, uri: CF, address: body.wallet, userId: USER_ID, purpose: body.purpose, nonce: 'ab'.repeat(32), issuedAt: new Date(nowSec() * 1000), expiresAt: new Date((nowSec() + 300) * 1000) }),
           expiresAt: new Date((nowSec() + 300) * 1000).toISOString(),
         };
         json = mock.challenge;
@@ -1730,6 +1734,7 @@ await section('25 ClubFund', async () => {
     const FAKE_WALLET = `(() => {
       const account = { address: ${JSON.stringify(ADDRESS)}, publicKey: new Uint8Array(32), chains: ['solana:devnet'], features: ['solana:signMessage', 'solana:signTransaction'] };
       const flag = (k) => localStorage.getItem('test:' + k);
+      const listeners = [];
       const wallet = {
         version: '1.0.0', name: 'Test Wallet', icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=',
         chains: ['solana:devnet'], accounts: [],
@@ -1740,12 +1745,23 @@ await section('25 ClubFund', async () => {
             localStorage.setItem('test:authorized', '1'); const acct = { ...account, address: flag('account') || account.address }; wallet.accounts = [acct]; return { accounts: [acct] };
           } },
           'standard:disconnect': { version: '1.0.0', disconnect: async () => { wallet.accounts = []; localStorage.removeItem('test:authorized'); } },
-          'standard:events': { version: '1.0.0', on: () => () => {} },
+          'standard:events': { version: '1.0.0', on: (event, cb) => { if (event !== 'change') return () => {}; listeners.push(cb); return () => listeners.splice(listeners.indexOf(cb), 1); } },
           'solana:signMessage': { version: '1.0.0', signMessage: async ({ message }) => {
             if (flag('reject') === 'sign') throw Object.assign(new Error('User rejected the request.'), { code: 4001 });
             if (flag('reject') === 'hang') return new Promise(() => {});
             if (flag('reject') === 'signfail') throw new Error('Ledger device is locked');
-            window.__signed = new TextDecoder().decode(message);
+            const text = new TextDecoder().decode(message);
+            // Like Phantom: an SIWS-formatted request is validated before it is shown.
+            const siws = /^(.+) wants you to sign in with your Solana account:\\n([1-9A-HJ-NP-Za-km-z]{32,44})\\n/.exec(text);
+            if (siws) {
+              if (siws[1] !== location.host) throw new Error("The app's signature request cannot be shown as the domain does not match.");
+              if (siws[2] !== wallet.accounts[0]?.address) throw new Error("The app's signature request cannot be shown as the address does not match.");
+              const chain = /\\nChain ID: (.+)/.exec(text)?.[1];
+              if (chain !== undefined && chain !== (flag('network') || 'mainnet'))
+                throw new Error("The app's signature request cannot be shown as the chain ID does not match the provided chain ID for verification.");
+            }
+            if (flag('reject') === 'chain') throw new Error("The app's signature request cannot be shown as the chain ID does not match the provided chain ID for verification.");
+            window.__signed = text;
             return [{ signedMessage: message, signature: new Uint8Array(64).fill(7) }];
           } },
           'solana:signTransaction': { version: '1.0.0', supportedTransactionVersions: ['legacy'], signTransaction: async ({ transaction, chain }) => {
@@ -1759,6 +1775,8 @@ await section('25 ClubFund', async () => {
           } },
         },
       };
+      // Switching accounts inside the wallet, as Phantom does: the dapp gets a change event with the new account.
+      window.__switchAccount = (address) => { const acct = { ...account, address }; wallet.accounts = [acct]; for (const cb of [...listeners]) cb({ accounts: [acct] }); };
       if (flag('noWallet')) return;
       const reg = ({ register }) => register(wallet);
       window.addEventListener('wallet-standard:app-ready', (e) => reg(e.detail));
@@ -1849,6 +1867,26 @@ await section('25 ClubFund', async () => {
     await clickT(`byText('main button', 'Sign verification message')`);
     check(A, "wallet error: the wallet's own message is shown for troubleshooting", await waitT(`$('main [role=alert]')?.textContent.includes('Wallet message: Ledger device is locked')`));
     check(A, 'cancel, stuck popup and wallet error reused one challenge (no new requests)', challengeRequests() === firstChallenge);
+    await evT(`localStorage.setItem('test:reject', 'chain'); return true`);
+    await clickT(`byText('main button', 'Sign verification message')`);
+    check(A, 'wallet network mismatch: clear Devnet guidance plus the wallet message', await waitT(`$('main [role=alert]')?.textContent.includes('network mismatch') && $('main [role=alert]').textContent.includes('Solana Devnet') && $('main [role=alert]').textContent.includes('chain ID does not match')`));
+    await evT(`localStorage.removeItem('test:reject'); return true`);
+
+    // Wrong account selected in the wallet: a campaign's recipient wallet can't be linked as the student's own.
+    await evT(`window.__switchAccount(${JSON.stringify(R_EQUIP)}); return true`);
+    check(A, 'wallet switched to a recipient account: address updates, warning shown, signing blocked', await waitT(`$('[data-testid=cf-connected-address]')?.textContent.trim() === ${JSON.stringify(R_EQUIP)} && $('main [role=alert]')?.textContent.includes('recipient wallet of "Demo Club: Equipment & Supplies"') && byText('main button', 'Sign verification message').disabled`));
+    await evT(`window.__switchAccount(${JSON.stringify(ADDRESS)}); return true`);
+    check(A, 'back on the contributing account: signing allowed again', await waitT(`$('[data-testid=cf-connected-address]')?.textContent.trim() === ${JSON.stringify(ADDRESS)} && !byText('main button', 'Sign verification message').disabled`));
+
+    // Account switch while a signature is pending: that attempt is abandoned; the next one is for the account shown.
+    const OTHER_ACCOUNT = base58.encode(new Uint8Array(32).fill(12));
+    await evT(`localStorage.setItem('test:reject', 'hang'); return true`);
+    await clickT(`byText('main button', 'Sign verification message')`);
+    await waitT(`!!byText('main button', 'Stop waiting')`);
+    await evT(`window.__switchAccount(${JSON.stringify(OTHER_ACCOUNT)}); return true`);
+    check(A, 'account switched mid-signature: attempt cancelled, new account shown', await waitT(`$('main [role=alert]')?.textContent.includes('switched accounts, so that request was cancelled') && $('[data-testid=cf-connected-address]').textContent.trim() === ${JSON.stringify(OTHER_ACCOUNT)} && !byText('main button', 'Stop waiting')`));
+    await evT(`localStorage.removeItem('test:reject'); window.__switchAccount(${JSON.stringify(ADDRESS)}); return true`);
+    await waitT(`$('[data-testid=cf-connected-address]')?.textContent.trim() === ${JSON.stringify(ADDRESS)}`);
     await evT(`localStorage.removeItem('test:reject'); return true`);
     await evT(`document.querySelector('[data-testid=cf-connected] button.btn-primary').click(); document.querySelector('[data-testid=cf-connected] button.btn-primary').click(); return true`);
     await waitT(`!!$('main [role=alert]') || $('main').textContent.includes('Wallet linked')`);
@@ -1883,6 +1921,8 @@ await section('25 ClubFund', async () => {
     check(A, 'retry after a server refusal reused the open challenge; it is cleared once used', challengeRequests() === beforeLink && (await evT(`return sessionStorage.getItem('myclubs:clubfund:challenge') === null`)));
     const signed = await evT(`return window.__signed`);
     check(A, 'wallet signed exactly the server challenge (no email inside)', signed === mock.challenge.message && !signed.includes('@'));
+    check(A, 'regression: the real server challenge passes Phantom-style SIWS checks (no Chain ID line)', !/Chain ID/i.test(signed) && signed.startsWith(`localhost:${CF_PORT} wants you to sign in with your Solana account:\n${ADDRESS}\n`));
+    check(A, 'every challenge was requested for the contributing account, never the recipient', mock.requests.filter((r) => r.path === '/functions/v1/wallet-challenge').every((r) => r.body.wallet === ADDRESS));
     check(A, 'link calls carry the session token, not a user id', mock.requests.filter((r) => r.path.startsWith('/functions/')).every((r) => /^Bearer /.test(r.auth ?? '') && !('userId' in (r.body ?? {})) && !('email' in (r.body ?? {}))));
     await go('/clubs/clubfund');
     check(A, 'verified link still shown after refresh', await waitT(`$('main').textContent.includes('Wallet linked')`));

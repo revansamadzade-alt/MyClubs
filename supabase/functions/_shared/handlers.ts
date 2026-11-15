@@ -43,6 +43,8 @@ export class StoreError extends Error {
 export interface Store {
   getLink(userId: string): Promise<LinkRow | null>;
   getLinkByWallet(wallet: string): Promise<LinkRow | null>;
+  /** True when the address is a ClubFund campaign's recipient (it can't also be a contributor's wallet). */
+  isCampaignRecipient(wallet: string): Promise<boolean>;
   /**
    * Returns the user's still-open challenge for this wallet and purpose (`reused`), or stores a new one with this
    * nonce and message. Throws StoreError('rate_limited', retryAfter) when too many new challenges were requested.
@@ -85,6 +87,7 @@ const MESSAGES: Record<string, string> = {
   invalid_wallet: 'That is not a valid Solana wallet address.',
   already_linked: 'Your account already has a linked wallet. Unlink it first to link a different one.',
   wallet_in_use: 'This wallet is already linked to another MyClubs account.',
+  wallet_is_recipient: "That address is a ClubFund campaign's recipient wallet. Switch your wallet to your own account and link that one.",
   not_linked: 'Your account has no linked wallet.',
   not_linked_wallet: 'Connect the wallet that is linked to your account to unlink it.',
   rate_limited: 'Too many wallet verification requests. Wait a few minutes and try again.',
@@ -125,6 +128,7 @@ const STATUS: Record<string, number> = {
   invalid_wallet: 400,
   already_linked: 409,
   wallet_in_use: 409,
+  wallet_is_recipient: 409,
   not_linked: 404,
   not_linked_wallet: 409,
   rate_limited: 429,
@@ -290,6 +294,7 @@ async function challenge(body: Record<string, unknown>, user: AuthedUser, deps: 
     if (own) return fail('already_linked', cors);
     const other = await deps.store.getLinkByWallet(wallet);
     if (other && other.user_id !== user.id) return fail('wallet_in_use', cors);
+    if (await deps.store.isCampaignRecipient(wallet)) return fail('wallet_is_recipient', cors);
   } else {
     if (!own) return fail('not_linked', cors);
     if (own.wallet_address !== wallet) return fail('not_linked_wallet', cors);
