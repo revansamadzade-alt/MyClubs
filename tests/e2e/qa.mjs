@@ -441,7 +441,7 @@ await section('10 Nav', async () => {
   await click(`$('header button[aria-controls=clubs-nav]')`);
   check('10 Nav', 'collapse section nav', !(await ev(`return !!$('#clubs-nav')`)));
   await click(`$('header button[aria-controls=clubs-nav]')`);
-  await goto('/');
+  await goto('/dashboard');
   await click(`byText('main a', 'Show all in My Campus Life')`);
   check('10 Nav', 'Dashboard → My Campus Life link', (await path()) === '/clubs/campus-life');
   await goto('/calendar');
@@ -569,7 +569,7 @@ await section('12 Calendar', async () => {
   check('Calendar views', 'view choice persists', (await ev(`return ${view('Month')}.getAttribute('aria-pressed')`)) === 'true');
   check('Persist', 'calendar data persists after refresh', (await labels('Sunrise Hike: Mount Sugarloaf')).length === 1);
 
-  await goto('/');
+  await goto('/dashboard');
   check('E Regression', 'dashboard: 8 course cards + To Do', await ev(`return $$('main article').length === 8 && $('main h1').textContent === 'Dashboard' && $('aside h2').textContent.includes('To Do')`));
   check('E Regression', 'dashboard Coming Up shows verified meetings', await ev(`return $('aside').textContent.includes('Chess Club')`));
 });
@@ -685,7 +685,7 @@ await section('15 Find My Fit', async () => {
   await click(`${chips('COMPSCI 235 Lab')}[0]`);
   check('F Fit', 'class item dialog labeled demo + course', await ev(`const t = $('dialog[open]').textContent; return t.includes('demo class schedule') && t.includes('Computer Systems Foundations')`));
   await esc();
-  await goto('/');
+  await goto('/dashboard');
   check('F Fit', 'dashboard To Do unaffected by class schedule', await ev(`return !$('aside').textContent.includes('Lab (demo')`));
   await ev(`localStorage.clear(); return true`);
 });
@@ -1351,7 +1351,7 @@ await section('23 Application features', async () => {
   check(A, 'application dates never count as conflicts', await ev(`return !$$('main button').some((b) => (b.getAttribute('aria-label') ?? '').startsWith('Audition: Comedy League') && b.getAttribute('aria-label').includes('Schedule conflict'))`));
 
   // Dashboard To Do.
-  await goto('/');
+  await goto('/dashboard');
   check(A, 'To Do lists application tasks, labeled as MyClubs (not Canvas)', await ev(`const t = $('[data-testid=todo-applications]'); return !!t && t.textContent.includes('Audition: Comedy League') && t.textContent.includes('Reminder: Outing Club') && t.textContent.includes('From MyClubs — not Canvas assignments.')`));
   check(A, 'To Do keeps the academic demo items', await ev(`return $$('aside[aria-label="To Do and upcoming"] > ul li').length > 0`));
   check(A, 'To Do shows unfinished drafts', await ev(`return $('[data-testid=todo-applications]').textContent.includes('Finish application draft:')`));
@@ -1378,7 +1378,7 @@ await section('23 Application features', async () => {
   check(A, 'delete profile removes it and the default résumé', (await ev(`return ls('myclubs:profile')`)) === null && (await idb('__default__')) === null);
   check(A, 'applications keep their own answers after profile deletion', (await stored('bestbuddies'))?.form?.values?.fullName === 'Jordan L.');
 
-  for (const p of ['/clubs/applications/profile', '/clubs/applications/comedyleague', '/clubs/campus-life', '/']) {
+  for (const p of ['/clubs/applications/profile', '/clubs/applications/comedyleague', '/clubs/campus-life', '/dashboard']) {
     await viewport(375, 812);
     await goto(p);
     check(A, `no horizontal scroll at 375px: ${p}`, await ev(`return document.documentElement.scrollWidth <= 375`));
@@ -1441,7 +1441,7 @@ await section('24 Accessibility', async () => {
 
   await goto('/clubs/discover/comedyleague');
   await click(`byText('main article > header button', 'Apply')`);
-  for (const p of ['/', '/clubs/discover', '/clubs/discover/comedyleague', '/clubs/fit', '/clubs/following', '/clubs/events', '/clubs/campus-life', '/clubs/applications', '/clubs/applications/profile', '/clubs/applications/comedyleague', '/clubs/applications/demo-org/apply', '/clubs/applications/demo-org/apply?view=review']) {
+  for (const p of ['/', '/dashboard', '/clubs/discover', '/clubs/discover/comedyleague', '/clubs/fit', '/clubs/following', '/clubs/events', '/clubs/campus-life', '/clubs/applications', '/clubs/applications/profile', '/clubs/applications/comedyleague', '/clubs/applications/demo-org/apply', '/clubs/applications/demo-org/apply?view=review']) {
     await goto(p);
     await audit(p);
   }
@@ -2116,10 +2116,54 @@ await section('25 ClubFund', async () => {
   }
 });
 
+// 26. Homepage: "/" is MyClubs (not the Dashboard), works signed out, and leads to each part of the app.
+await section('26 Homepage', async () => {
+  const H = 'H Home';
+  await viewport(1440);
+  await goto('/');
+  await ev(`localStorage.clear(); sessionStorage.clear(); return true`);
+  await reload();
+  check(H, '"/" opens the MyClubs homepage, not the Dashboard (signed out, empty storage)', await ev(`return location.pathname === '/' && $('main h1').textContent.trim() === 'MyClubs' && document.title === 'Home · MyClubs' && !$$('main h1').some((h) => h.textContent.includes('Dashboard'))`));
+  check(H, 'explains MyClubs and that Canvas is only the setting; prototype disclaimer visible', await ev(`const t = document.body.textContent; return $('main').textContent.includes('Find clubs that match your interests and your class schedule') && t.includes('MyClubs is the product') && t.includes('independent HackUMass 2026 prototype')`));
+  const hrefs = await ev(`return Object.fromEntries($$('main a').map((a) => [a.textContent.trim(), a.getAttribute('href')]))`);
+  check(H, 'links: Explore Clubs, Find My Fit, ClubFund, Dashboard, Sign In / Get Started', hrefs['Explore Clubs'] === '/clubs/discover' && hrefs['Find My Fit'] === '/clubs/fit' && hrefs['ClubFund'] === '/clubs/clubfund' && hrefs['Dashboard'] === '/dashboard' && hrefs['Sign In / Get Started'] === '/clubs/clubfund' && hrefs['Campus Events'] === '/clubs/events' && hrefs['My Campus Life'] === '/clubs/campus-life' && hrefs['Applications'] === '/clubs/applications', JSON.stringify(hrefs));
+  check(H, 'global nav: Dashboard points to /dashboard and is not marked current on the homepage', await ev(`const a = byText('nav[aria-label="Global navigation"] a', 'Dashboard'); return a.getAttribute('href') === '/dashboard' && a.getAttribute('aria-current') !== 'page'`));
+  await click(`$('main a.btn-primary')`);
+  check(H, 'Explore Clubs opens Discover', (await path()) === '/clubs/discover' && (await waitFor(`$('main h1')?.textContent.includes('Discover Student Organizations')`, 8000)));
+  await click(`$('nav[aria-label="Global navigation"] a[aria-label^="MyClubs home"]')`);
+  check(H, 'logo returns to the homepage', (await path()) === '/' && (await ev(`return $('main h1').textContent.trim() === 'MyClubs'`)));
+  await click(`byText('main li a', 'Dashboard')`);
+  check(H, 'Dashboard opens at /dashboard', (await path()) === '/dashboard' && (await ev(`return $('main h1').textContent.trim() === 'Dashboard' && document.title === 'Dashboard · MyClubs' && byText('nav[aria-label="Global navigation"] a', 'Dashboard').getAttribute('aria-current') === 'page'`)));
+  await goto('/');
+  await click(`byText('main li a', 'Find My Fit')`);
+  check(H, 'Find My Fit card opens Find My Fit', (await path()) === '/clubs/fit');
+  await goto('/');
+  await click(`byText('main a', 'Sign In / Get Started')`);
+  check(H, 'Sign In / Get Started opens ClubFund (UMass email verification or setup notice)', (await path()) === '/clubs/clubfund' && (await waitFor(`$('main h1')?.textContent.trim() === 'ClubFund'`, 8000)));
+  await goto('/calendar');
+  check(H, 'placeholder "Back to Dashboard" goes to /dashboard', await ev(`return byText('main a', 'Back to Dashboard').getAttribute('href') === '/dashboard'`));
+  await goto('/dashboard');
+  await reload();
+  check(H, 'direct visit and refresh of /dashboard', (await path()) === '/dashboard' && (await ev(`return $('main h1').textContent.trim() === 'Dashboard'`)));
+  await goto('/');
+  await reload();
+  check(H, 'refreshing the homepage stays on the homepage', (await path()) === '/' && (await ev(`return $('main h1').textContent.trim() === 'MyClubs'`)));
+  check(H, 'one h1; every homepage link has an accessible name', await ev(`return $$('main h1').length === 1 && $$('main a').every((a) => a.textContent.trim() || a.getAttribute('aria-label'))`));
+
+  // Phone: layout, and the menu's logo leads home.
+  await viewport(375, 812);
+  await goto('/');
+  check(H, 'homepage on a 375 px phone: no horizontal scroll, cards in one column', await ev(`const tiles = $$('main li.card'); return document.documentElement.scrollWidth <= 375 && tiles.length === 7 && tiles.every((c) => c.getBoundingClientRect().width > 300)`));
+  await goto('/dashboard');
+  await click(`$('header a[aria-label^="MyClubs home"]')`);
+  check(H, 'phone header logo returns to the homepage', (await path()) === '/');
+  await viewport(1440);
+});
+
 // 11. Overflow / responsive
 const overflow = [];
 await section('11 Responsive', async () => {
-  const routes = ['/', '/clubs/discover', '/clubs/fit', '/clubs/discover/vietnamesestudentassociation', '/clubs/following', '/clubs/events', '/clubs/events/ev-career-fair', '/clubs/campus-life', '/calendar'];
+  const routes = ['/', '/dashboard', '/clubs/discover', '/clubs/fit', '/clubs/discover/vietnamesestudentassociation', '/clubs/following', '/clubs/events', '/clubs/events/ev-career-fair', '/clubs/campus-life', '/calendar'];
   for (const w of [320, 375, 414, 768, 1024, 1280, 1440]) {
     await viewport(w);
     for (const r of routes) {
@@ -2133,7 +2177,7 @@ await section('11 Responsive', async () => {
       if (res.sw > res.W || res.off.length) overflow.push({ w, r, ...res });
     }
   }
-  check('11 Responsive', 'no horizontal page overflow (7 widths × 8 routes)', overflow.length === 0, JSON.stringify(overflow.slice(0, 3)));
+  check('11 Responsive', `no horizontal page overflow (7 widths × ${routes.length} routes)`, overflow.length === 0, JSON.stringify(overflow.slice(0, 3)));
   // Campus Life week view on phone stays inside its scroller
   await viewport(375);
   await goto('/clubs/campus-life');

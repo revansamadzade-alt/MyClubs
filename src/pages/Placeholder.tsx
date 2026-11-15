@@ -22,7 +22,7 @@ export default function Placeholder({ item }: { item?: NavItem }) {
           <Link to="/clubs/discover" className="btn btn-primary">
             Explore MyClubs
           </Link>
-          <Link to="/" className="btn btn-secondary">
+          <Link to="/dashboard" className="btn btn-secondary">
             Back to Dashboard
           </Link>
         </div>

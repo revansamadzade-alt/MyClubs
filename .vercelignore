@@ -1,0 +1,10 @@
+# Never upload local secrets or build/test leftovers with `vercel deploy` (Vercel builds from source).
+.env*
+!.env.example
+.vercel
+.agents
+skills-lock.json
+node_modules
+dist
+supabase/.temp
+tests/e2e/output

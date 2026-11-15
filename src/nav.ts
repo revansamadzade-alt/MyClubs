@@ -25,7 +25,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { to: '/account', label: 'Account', icon: UserRound, prototype: true },
-  { to: '/', label: 'Dashboard', icon: Gauge },
+  { to: '/dashboard', label: 'Dashboard', icon: Gauge },
   { to: '/courses', label: 'Courses', icon: BookOpen, prototype: true },
   { to: '/groups', label: 'Groups', icon: Users, prototype: true },
   { to: '/clubs', label: 'MyClubs', icon: HeartHandshake },

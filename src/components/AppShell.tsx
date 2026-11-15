@@ -90,7 +90,7 @@ export function AppShell() {
         >
           <Menu size={24} aria-hidden />
         </button>
-        <Link to="/" className="font-serif text-lg leading-none">
+        <Link to="/" className="font-serif text-lg leading-none" aria-label="MyClubs home (UMass Amherst)">
           UMass Amherst
         </Link>
       </header>

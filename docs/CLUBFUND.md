@@ -246,7 +246,9 @@ with `drop function public.clubfund_request_challenge(uuid,text,text,text,text,i
 public.clubfund_take_rate_token(uuid,text,integer,integer); drop table public.clubfund_rate_events;`.
 
 **Recipient wallets.** `npm run clubfund:recipients` (or `npm run clubfund:recipients check <address> -- --contributor <wallet>`) lists which campaigns can take contributions and why not.
-`node scripts/clubfund-recipient.mjs check <public address> --campaign demo-club-equipment --contributor <linked wallet>`
+`node scripts/clubfund-recipient.mjs check <public address> --campaign demo-club-equipment --contributor <your linked wallet>`
 validates a recipient (base58, 32 bytes, on-curve wallet key, not a program, not the contributor, not used by another
 campaign), looks it up on Devnet (read-only) and prints the one-campaign confirmation SQL. It never runs that SQL and
 never asks for a recovery phrase or private key; only the owner can confirm they control the address.
+
+**Phantom chain ID fix (deployed 2026-11-15 08:08 UTC, functions v3).** Challenges no longer include the optional SIWS `Chain ID` line: Phantom compares it with its own selected network and refused to show the request ("the chain ID does not match the provided chain ID for verification"). Signature verification is unchanged (exact bytes, Ed25519). `wallet-challenge` also refuses to link a campaign recipient wallet (`wallet_is_recipient`), and the link step shows the full address of the account Phantom has selected; whichever account the student selects and verifies is the one linked.

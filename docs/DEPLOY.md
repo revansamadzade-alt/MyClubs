@@ -6,17 +6,15 @@ MyClubs is a static single-page app on Vercel. Everything except ClubFund stays 
 
 ## What Vercel does (`vercel.json`)
 
-- **Build command:** `npm run build:fresh` → `scripts/build-fresh.mjs`
-  1. Refreshes `src/data/generated/campus-data.json` from the public feeds (`npm run sync:data`). Each source that fails
-     keeps its previous data; if the sync fails outright or produces an unusable snapshot, the committed snapshot is
-     restored and the build continues.
-  2. Runs `npm run build` (typecheck + Vite production build into `dist/`).
+- **Build command:** `npm run build` (typecheck + Vite production build into `dist/`), so the deploy ships exactly the
+  committed, tested data snapshot. `npm run build:fresh` (`scripts/build-fresh.mjs`) instead refreshes
+  `src/data/generated/campus-data.json` from the public feeds first (each failing source keeps its previous data; an
+  unusable sync falls back to the committed snapshot); switch `buildCommand` back to it to refresh data on each deploy.
 - **Routing:** every path rewrites to `/index.html`, so deep links and refreshes (for example
   `/clubs/clubfund/campaigns/demo-club-equipment` or `/clubs/applications/demo-org/apply`) load the app. Hashed assets
   in `dist/assets/` are served as files (Vercel serves existing files before applying rewrites).
 
-To deploy exactly the snapshot that was tested (no refresh at build time), change `buildCommand` in `vercel.json` to
-`npm run build`.
+`.vercelignore` keeps `.env*` files and local build/test output out of CLI uploads.
 
 ## Environment variables
 
@@ -82,5 +80,5 @@ The repository is `https://github.com/revansamadzade-alt/MyClubs` (`master`).
 2. In Vercel: import the repository (framework preset Vite; build command and output come from `vercel.json`), then
    add the environment variables above for **Production** and redeploy.
 3. Set `CLUBFUND_ALLOWED_ORIGINS` (above) to include the production URL.
-4. After the deploy, open `/`, `/clubs/discover`, `/clubs/clubfund` and refresh a nested route such as
+4. After the deploy, open `/` (the MyClubs homepage), `/dashboard`, `/clubs/discover`, `/clubs/clubfund` and refresh a nested route such as
    `/clubs/clubfund/campaigns/demo-club-equipment` to confirm the rewrite works.

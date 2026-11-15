@@ -50,7 +50,7 @@ export function GlobalNav({ variant = 'rail', onNavigate }: Props) {
           'flex shrink-0 font-serif leading-[0.92] text-white',
           rail ? 'h-[85px] flex-col items-center justify-center' : 'h-20 flex-col justify-center px-6',
         )}
-        aria-label="UMass Amherst — Dashboard"
+        aria-label="MyClubs home (UMass Amherst)"
       >
         <span className="text-[1.25rem] tracking-[-0.02em]">UMass</span>
         <span className="text-[1.0625rem] tracking-[-0.02em]">Amherst</span>

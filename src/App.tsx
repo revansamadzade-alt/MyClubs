@@ -3,9 +3,11 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { NAV_ITEMS } from './nav';
 import Dashboard from './pages/Dashboard';
+import Home from './pages/Home';
 import Placeholder from './pages/Placeholder';
 
-// MyClubs pages load on demand (one small chunk each); the shell, Dashboard and placeholders stay in the main bundle.
+// MyClubs pages load on demand (one small chunk each); the shell, homepage, Dashboard and placeholders stay in the main
+// bundle.
 const ClubsLayout = lazy(() => import('./pages/clubs/ClubsLayout'));
 const Discover = lazy(() => import('./pages/clubs/Discover'));
 const ClubProfile = lazy(() => import('./pages/clubs/ClubProfile'));
@@ -38,7 +40,8 @@ export default function App() {
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route index element={<Dashboard />} />
+        <Route index element={<Home />} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="clubs" element={page(<ClubsLayout />)}>
           <Route index element={<Navigate to="discover" replace />} />
           <Route path="discover" element={page(<Discover />)} />

@@ -5,17 +5,33 @@ Supabase project `zanhvwuvuvfxetqkojbw`. Checked on 2026-11-15.
 
 ## Real transaction status
 
-**No real wallet link and no real Devnet contribution has happened yet.** The only live wallet activity on record is
-five unfinished link attempts for one wallet (2026-11-15 02:58–02:59 UTC). None reached the server's signature check,
-and they ended in the rate limit. That limit has expired; no challenge is open now. Every contribution test so far
-uses a mocked Supabase, a mocked Devnet RPC and a scripted wallet.
+- **Real wallet link: done.** 2026-11-15 08:06:58–08:07:02 UTC. `wallet-challenge` returned 200, then `wallet-link`
+  returned 200. The server checked the challenge, compared the exact signed bytes and verified the Ed25519 signature
+  before storing the link. Linked wallet: the account active in Phantom at the time, `71sn…KuWz` (Devnet, on the
+  owner's @umass.edu account). The app links whichever account is selected and verified in Phantom; no wallet address
+  is hard-coded.
+- **Real Devnet contribution: not yet.** The linked wallet has 0 Devnet SOL (checked 2026-11-15); it needs the faucet
+  first.
+- Earlier unfinished attempts (02:58–02:59 and 07:07 UTC) stopped inside Phantom: "the chain ID does not match the
+  provided chain ID for verification". The challenge carried the optional SIWS `Chain ID` line, which Phantom
+  compares with its own network. That line was removed in `c8034d2` (deployed 08:08 UTC).
 
-## Deployed 2026-11-15 (approved steps 1–3)
+## Deployed 2026-11-15 (all approved)
 
-- 07:44 UTC: migration `20261115090000_clubfund_challenge_reuse_and_rate_limits.sql` applied (`db push`); verified new functions and table, service-role-only grants, RLS, existing objects and campaigns unchanged. Supabase had no platform backup yet (PITR off, daily list empty), so a read-only snapshot of all public rows and function definitions was taken first.
-- 07:44 UTC: `wallet-challenge`, `wallet-link`, `wallet-unlink`, `campaign-contribute` redeployed from `5da6db2` (version 2, ACTIVE, `verify_jwt: true`); credential-free probes unchanged; logs show clean boots and only the expected origin warnings.
-- 07:45 UTC: `demo-club-equipment` recipient set to `6Q5tJXKhJ6yL6AYeHkyrKcFvKgEjmszCQniegH5qP8gV` (exactly one row; the other five untouched). The live app shows it as the only campaign open for Devnet contributions.
-- Not done (by request): Auth hook, `CLUBFUND_ALLOWED_ORIGINS`, Vercel, GitHub push. No real wallet link or Devnet contribution yet.
+- 07:44 UTC: migration `20261115090000_clubfund_challenge_reuse_and_rate_limits.sql` applied (`db push`).
+  - New functions and table verified; grants are service-role only, with RLS.
+  - Existing objects and campaigns unchanged.
+  - Supabase had no platform backup yet (PITR off, daily list empty), so a read-only snapshot of all public rows and
+    function definitions was taken first.
+- 07:45 UTC: `demo-club-equipment` recipient set to `6Q5tJXKhJ6yL6AYeHkyrKcFvKgEjmszCQniegH5qP8gV` (exactly one row;
+  the other five untouched).
+- 08:08 UTC: `wallet-challenge`, `wallet-link`, `wallet-unlink`, `campaign-contribute` redeployed from `c8034d2`
+  (version 3, ACTIVE, `verify_jwt: true`).
+  - Challenges have no `Chain ID` line; recipient wallets can't be linked.
+  - Credential-free probes unchanged, and the logs show no errors.
+  - Rollback: `git worktree add ../myclubs-rollback 5da6db2`, then from there
+    `npx supabase@2.122.0 functions deploy wallet-challenge wallet-link wallet-unlink campaign-contribute --project-ref zanhvwuvuvfxetqkojbw --use-api`.
+- Not done (by request): Auth hook, `CLUBFUND_ALLOWED_ORIGINS`, Vercel, GitHub push.
 
 ## Completed fixes
 
@@ -53,6 +69,7 @@ uses a mocked Supabase, a mocked Devnet RPC and a scripted wallet.
 | Pending migration dry-run | read-only live | only `20261115090000_clubfund_challenge_reuse_and_rate_limits.sql` pending; no name clashes; Postgres 17.11 |
 | Real wallet / real Devnet transaction | live | **not run** (needs your approvals in Phantom) |
 | Full clean rerun on production builds (all sections, after both fixes) | mocked browser | **458/458**, 0 console issues |
+| Full run on production builds after the Phantom chain ID fix (`c8034d2`) | mocked browser | **464/464**, 0 console issues |
 
 `/verify` (gstack-checks): typecheck PASS and build PASS. Tests show UNMAPPED, because the tool reads its source-to-test
 map (`.gstack/pregate.json`, added on this branch) only from `origin/master`.
@@ -71,16 +88,13 @@ map (`.gstack/pregate.json`, added on this branch) only from `origin/master`.
 
 ## Still blocked (needs you)
 
-1. **Approval to apply** migration `20261115090000_clubfund_challenge_reuse_and_rate_limits.sql` and **redeploy** the
-   four functions. This is the server half of the lockout fix, plus the contribution rate limit.
-2. **Recipient for `demo-club-equipment`: provided and validated** (`6Q5tJXKhJ6yL6AYeHkyrKcFvKgEjmszCQniegH5qP8gV`: valid on-curve wallet key, not a program, different from the contributing wallet `7tec…Biu3`, unused by other campaigns, no Devnet account yet, which is fine). Its one-row SQL update is prepared and waiting for approval; a local simulation shows it enables only this campaign.
-3. **Enable the Auth hook:** Dashboard → Authentication → Hooks → *Before User Created* → Postgres → schema `public` →
-   `hook_before_user_created_umass_only`. The read-only check found no problem with the function. Whether it is
-   switched on can't be read with the read-only tools.
-4. **The Vercel production URL**, then approval to set `CLUBFUND_ALLOWED_ORIGINS`.
-5. **Push and deploy:** push `fix/demo-readiness` and merge into `master`, then deploy Vercel with the env vars in
-   [DEPLOY.md](DEPLOY.md).
-6. **The real Phantom test.** Only you can approve the wallet prompts.
+1. **The real Devnet contribution.** Fund the linked wallet at the faucet, then contribute 0.01 SOL (checklist below).
+2. **Enable the Auth hook:** Dashboard → Authentication → Hooks → *Before User Created* → Postgres → schema `public`
+   → `hook_before_user_created_umass_only`. The read-only check found no problem with the function.
+3. **Vercel:**
+   - Push `fix/demo-readiness` and merge into `master`.
+   - Import or redeploy the project in Vercel with the env vars below.
+   - Then send the production URL so `CLUBFUND_ALLOWED_ORIGINS` can be set (approval needed).
 
 ## Security status
 
@@ -107,42 +121,62 @@ map (`.gstack/pregate.json`, added on this branch) only from `origin/master`.
 
 ## Deployment readiness
 
-- **Code:** `fix/demo-readiness`. Commits: `abe8011` (server), `19fa80c` (browser), `cb83bcd` (recipient script), plus
-  the docs/test commit after this file.
-- **Supabase (needs approval, in this order):**
-  1. `npx supabase@2.122.0 db push --linked` (applies `20261115090000_clubfund_challenge_reuse_and_rate_limits.sql`;
-     additive).
-  2. `npx supabase@2.122.0 functions deploy wallet-challenge wallet-link wallet-unlink campaign-contribute --project-ref zanhvwuvuvfxetqkojbw --use-api`
-     (JWT verification stays on).
-  3. After the Vercel URL is known:
-     `npx supabase@2.122.0 secrets set --project-ref zanhvwuvuvfxetqkojbw CLUBFUND_ALLOWED_ORIGINS="https://<app>.vercel.app,http://localhost:5173,http://localhost:4173"`.
-  4. Optional: `SOLANA_DEVNET_RPC_URL` (server) and `VITE_SOLANA_DEVNET_RPC_URL` (Vercel) for a dedicated Devnet RPC.
-- **Vercel:** set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` for Production, then deploy (see
-  [DEPLOY.md](DEPLOY.md)).
-- **Compatibility:**
-  - Either order of steps 1 and 2 works. Redeployed functions fall back to the original SQL challenge function until the migration exists; the contribution limit is skipped until then, which matches today's behavior.
-  - The migration only adds objects; nothing existing changes.
+- **Code:** branch `fix/demo-readiness`, local and not pushed. Commits:
+  - `abe8011`: server hardening
+  - `19fa80c`: browser fixes
+  - `cb83bcd`: recipient script
+  - `5da6db2`: docs and test waits
+  - `b08824e`: deployment record
+  - `c8034d2`: Phantom chain ID fix
+  - plus this update
+- **Supabase:**
+  - Done: migrations, functions v3, recipient.
+  - Pending: `CLUBFUND_ALLOWED_ORIGINS` once the Vercel URL is known (see below).
+  - Optional: `SOLANA_DEVNET_RPC_URL` (server) and `VITE_SOLANA_DEVNET_RPC_URL` (Vercel) for a dedicated Devnet RPC.
+- **Production bundle checked against the live backend** (`vite preview` on 4173, an allowed local origin):
+  - Direct routes return 200.
+  - 6 campaigns load, 1 open, recipient shown with a Devnet Explorer link, no setup warnings, no console errors.
+  - All four functions answer the preflight from that origin.
+  - The bundle contains only the project URL and publishable key; no secrets.
 - **Rollback:**
-  - Functions: redeploy the previous code (`git worktree add ../myclubs-rollback 166a133`, then run the deploy command
-    from that folder with `--project-ref zanhvwuvuvfxetqkojbw --use-api`).
-  - Database: the new objects can stay unused, or be removed with
+  - Functions: `git worktree add ../myclubs-rollback 5da6db2` (version 2) or `166a133` (version 1), then deploy from
+    that folder with `--project-ref zanhvwuvuvfxetqkojbw --use-api`.
+  - Recipient: `update public.campaigns set recipient_address = null, recipient_confirmed_at = null where slug = 'demo-club-equipment';`
+  - Migration objects (only after rolling functions back to version 1):
     `drop function public.clubfund_request_challenge(uuid,text,text,text,text,integer); drop function public.clubfund_take_rate_token(uuid,text,integer,integer); drop table public.clubfund_rate_events;`
-    (only after the old functions are redeployed).
 
-## Five-minute final checklist
+## Vercel deployment (prepared, not done)
 
-1. Approve, then run, the migration and function deploy (two commands above).
-2. In Phantom: Settings → Developer Settings → Testnet Mode on → Solana **Devnet**. Create a second account for the
-   recipient.
-3. Recipient (done: validated with `npm run clubfund:recipients check 6Q5tJXKhJ6yL6AYeHkyrKcFvKgEjmszCQniegH5qP8gV -- --contributor 7tecWdCmP1QckuKK4kMpqoR2upkW5Hdi1UnesDKZBiu3`):
-   run the approved SQL update in the Supabase SQL Editor.
-4. Enable the Auth hook (Dashboard, above).
-5. Run `npm run dev` and open `http://localhost:5173/clubs/clubfund`.
-6. Verify your UMass email, then connect Phantom. Click **Sign verification message** and approve it once. If the
-   popup doesn't appear, open the Phantom extension or use **Stop waiting** and sign again; no new request is created.
-7. Get Devnet SOL at https://faucet.solana.com for the linked address, then refresh the balance.
-8. Open "Demo Club: Equipment & Supplies" → **Support This Campaign** → `0.01` → Review → tick → **Approve in wallet**,
-   and approve in Phantom.
-9. Wait for "Contribution verified", then open the Explorer link (Devnet). Refresh to see the total and history persist.
-10. If anything is interrupted, use "Check its status" or "Contribution didn't finish? Check a transaction". Don't send
-    a second transaction.
+1. Push and merge (approval): `git push origin fix/demo-readiness`, then merge into `master` on GitHub. CI runs
+   typecheck, unit tests, build and the browser suite on the production build.
+2. Vercel → Project → Settings → Environment Variables, for **Production** (and Preview if wanted):
+   - `VITE_SUPABASE_URL` = `https://zanhvwuvuvfxetqkojbw.supabase.co`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY` = the publishable key (`sb_publishable_…`, the same value as in `.env.local`)
+   - optional: `VITE_SOLANA_DEVNET_RPC_URL` = a dedicated Devnet RPC
+
+   Never add the secret or service-role key.
+3. Deploy. `vercel.json` sets framework Vite, build `npm run build:fresh`, output `dist`, and the SPA rewrite. To
+   ship exactly the tested data snapshot instead of refreshing it at build time, use `npm run build`.
+4. Allow the production origin (approval; live setting):
+   `npx supabase@2.122.0 secrets set --project-ref zanhvwuvuvfxetqkojbw CLUBFUND_ALLOWED_ORIGINS="https://<app>.vercel.app,http://localhost:5173,http://localhost:4173"`
+5. Production checks:
+   - Open `/` (homepage), `/dashboard`, `/clubs/clubfund` and `/clubs/clubfund/campaigns/demo-club-equipment`, and refresh each.
+   - Verify your email and confirm the linked wallet shows.
+   - Confirm the function logs have no `origin_not_allowed` for the production URL.
+
+## Five-minute final checklist (real Phantom test)
+
+1. In Phantom: unlock it, select the account you will contribute from (the linked `71sn…KuWz`; never the recipient
+   `6Q5t…P8gV`), Settings → Developer Settings → Testnet Mode on → **Solana Devnet**.
+2. Open `http://localhost:5173/clubs/clubfund` (or the production URL once allowed). Verify your UMass email if asked.
+   The page shows "Wallet linked" with `71sn…KuWz`.
+   - To use a different account instead: Wallet settings → connect the linked account → **Sign and unlink**. Then
+     select the new account in Phantom, reconnect, and **Sign verification message**. The page always shows the full
+     address it will link.
+3. Get Devnet SOL at https://faucet.solana.com for the linked address, then click the refresh icon next to the balance.
+4. Open "Demo Club: Equipment & Supplies" → **Support This Campaign** → `0.01` → Review → tick →
+   **Approve in wallet**. In Phantom, check the recipient `6Q5t…P8gV` and 0.01 SOL, then approve once.
+5. Wait for "Contribution verified", open the Explorer link (Devnet), then refresh to see 0.01 Devnet SOL and 1 verified
+   transaction.
+6. If anything is interrupted: "Check its status" or "Contribution didn't finish? Check a transaction". Never send a
+   second transaction.
