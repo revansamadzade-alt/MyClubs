@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { base58 } from '@scure/base';
 
 const BASE = process.env.MYCLUBS_BASE_URL ?? 'http://localhost:5173';
 const TEST_NOW = process.env.MYCLUBS_TEST_NOW ?? '2026-11-13T12:00:00';
@@ -1538,7 +1539,7 @@ await section('25 ClubFund', async () => {
   const CF = `http://localhost:${CF_PORT}`;
   const server = spawn(process.execPath, [fileURLToPath(new URL('../../node_modules/vite/bin/vite.js', import.meta.url)), '--port', String(CF_PORT), '--strictPort'], {
     cwd: fileURLToPath(new URL('../..', import.meta.url)),
-    env: { ...process.env, VITE_SUPABASE_URL: `${CF}/__supabase`, VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test_only' },
+    env: { ...process.env, VITE_SUPABASE_URL: `${CF}/__supabase`, VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test_only', VITE_SOLANA_DEVNET_RPC_URL: `${CF}/__devnet` },
     stdio: 'ignore',
   });
   try {
@@ -1558,7 +1559,58 @@ await section('25 ClubFund', async () => {
       const jwt = `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: USER_ID, email: user.email, role: 'authenticated', aud: 'authenticated', iat, exp: iat + 7 * 86400, amr: [{ method: 'otp', timestamp: iat }] })}.test-signature`;
       return { access_token: jwt, token_type: 'bearer', expires_in: 7 * 86400, expires_at: iat + 7 * 86400, refresh_token: `refresh-${iat}`, user };
     };
-    const mock = { otp: 200, linked: null, challenge: null, failLink: null, requests: [], unlink: [] };
+    const mock = { otp: 200, linked: null, challenge: null, failLink: null, requests: [], unlink: [], contributions: [], contributeCalls: [], verify: 'ok', campaignsMissing: false };
+    // Demo campaigns as the database would return them (mocked). Recipients are deterministic test keys.
+    const R_EQUIP = base58.encode(new Uint8Array(32).fill(9));
+    const R_EVENT = base58.encode(new Uint8Array(32).fill(10));
+    const R_FOOD = base58.encode(new Uint8Array(32).fill(11));
+    const campaign = (o) => ({ description: 'A fictional Solana Devnet demonstration campaign.', recipient_address: null, recipient_confirmed_at: null, status: 'active', related_event_id: null, related_org_id: null, raised_lamports: 0, contribution_count: 0, created_at: '2026-11-13T10:00:00Z', updated_at: '2026-11-13T10:00:00Z', ...o });
+    mock.campaigns = [
+      campaign({ id: 'a0000000-0000-4000-8000-000000000001', slug: 'demo-club-competition-travel', category: 'club', title: 'Demo Club: Competition Travel', summary: 'Help a fictional team travel.', goal_lamports: 5_000_000_000 }),
+      campaign({ id: 'a0000000-0000-4000-8000-000000000002', slug: 'demo-club-equipment', category: 'club', title: 'Demo Club: Equipment & Supplies', summary: 'Help a fictional club replace equipment.', goal_lamports: 3_000_000_000, recipient_address: R_EQUIP, recipient_confirmed_at: '2026-11-13T11:00:00Z', related_org_id: 'vietnamesestudentassociation' }),
+      campaign({ id: 'a0000000-0000-4000-8000-000000000003', slug: 'demo-event-hackathon-workshop', category: 'event', title: 'Demo Event: Intro to Hackathons Workshop', summary: 'Snacks for the sample workshop.', goal_lamports: 2_000_000_000, recipient_address: R_EVENT, recipient_confirmed_at: '2026-11-13T11:00:00Z', related_event_id: 'ev-hack-workshop' }),
+      campaign({ id: 'a0000000-0000-4000-8000-000000000004', slug: 'demo-charity-food-drive', category: 'charity', title: 'Demo Charity: Food Drive Simulation', summary: 'A simulated food drive.', goal_lamports: 4_000_000_000, recipient_address: R_FOOD, recipient_confirmed_at: '2026-11-13T11:00:00Z' }),
+    ];
+    const DEVNET_LABEL = 'Demo fundraising only — uses Solana Devnet test tokens with no monetary value. No real donations are collected.';
+    // Mocked Solana Devnet JSON-RPC (deterministic). The real Devnet transaction is the manual test.
+    const DEVNET_GENESIS = 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG';
+    const BLOCKHASH = base58.encode(new Uint8Array(32).fill(4));
+    const dn = { genesis: DEVNET_GENESIS, balance: 1_500_000_000, send: 'ok', status: 'confirmed', blockHeight: 900, down: false, sent: [] };
+    const respondDevnet = async (p, call) => {
+      const body = JSON.parse(p.request.postData ?? '{}');
+      if (dn.down) return call('Fetch.failRequest', { requestId: p.requestId, errorReason: 'InternetDisconnected' });
+      let result;
+      let error;
+      const ctx = { context: { slot: 1 } };
+      if (body.method === 'getGenesisHash') result = dn.genesis;
+      else if (body.method === 'getBalance') result = { ...ctx, value: dn.balance };
+      else if (body.method === 'getLatestBlockhash') result = { ...ctx, value: { blockhash: BLOCKHASH, lastValidBlockHeight: 1000 } };
+      else if (body.method === 'getFeeForMessage') result = { ...ctx, value: 5000 };
+      else if (body.method === 'getMinimumBalanceForRentExemption') result = 890_880;
+      else if (body.method === 'getBlockHeight') result = dn.blockHeight;
+      else if (body.method === 'sendTransaction') {
+        const sentTx = Buffer.from(body.params[0], 'base64');
+        if (dn.send === 'reject') error = { code: -32002, message: 'Transaction simulation failed: Attempt to debit an account but found no record of a prior credit.' };
+        else {
+          dn.sent.push(sentTx);
+          if (dn.send === 'drop') return call('Fetch.failRequest', { requestId: p.requestId, errorReason: 'ConnectionReset' });
+          result = base58.encode(sentTx.subarray(1, 65));
+        }
+      } else if (body.method === 'getSignatureStatuses')
+        result = { ...ctx, value: [dn.status === 'none' ? null : { slot: 5, confirmations: 1, err: dn.status === 'failed' ? { InstructionError: [0, { Custom: 1 }] } : null, confirmationStatus: dn.status === 'failed' ? 'confirmed' : dn.status }] };
+      else error = { code: -32601, message: 'Method not found' };
+      await call('Fetch.fulfillRequest', {
+        requestId: p.requestId,
+        responseCode: 200,
+        responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+        body: Buffer.from(JSON.stringify(error ? { jsonrpc: '2.0', id: body.id, error } : { jsonrpc: '2.0', id: body.id, result })).toString('base64'),
+      });
+    };
+    /** The transfer inside a transaction the app sent: from, to, lamports (u64) and memo, read from the raw bytes. */
+    const readSent = (raw) => {
+      const msg = raw.subarray(65);
+      return { signature: base58.encode(raw.subarray(1, 65)), from: base58.encode(msg.subarray(4, 36)), to: base58.encode(msg.subarray(36, 68)), lamports: msg.readBigUInt64LE(174), memo: msg.subarray(185, 185 + msg[184]).toString('utf8') };
+    };
     const respond = async (p, call) => {
       const url = new URL(p.request.url);
       const path = url.pathname.replace(/^\/__supabase/, '');
@@ -1591,6 +1643,36 @@ await section('25 ClubFund', async () => {
           mock.linked = { wallet_address: body.wallet, chain: 'solana:devnet', linked_at: '2026-11-13T17:05:00Z', verified_at: '2026-11-13T17:05:00Z' };
           json = { link: mock.linked };
         }
+      } else if (path === '/rest/v1/campaigns') {
+        if (mock.campaignsMissing) [status, json] = [404, { code: 'PGRST205', message: "Could not find the table 'public.campaigns' in the schema cache" }];
+        else {
+          const slug = url.searchParams.get('slug')?.replace(/^eq\./, '');
+          json = mock.campaigns.filter((c) => !slug || c.slug === slug);
+        }
+      } else if (path === '/rest/v1/campaign_contributions') {
+        const id = url.searchParams.get('campaign_id')?.replace(/^eq\./, '');
+        json = mock.contributions.filter((c) => c.campaign_id === id);
+      } else if (path === '/rest/v1/contribution_owners') {
+        json = mock.contributions.map((c) => {
+          const k = mock.campaigns.find((x) => x.id === c.campaign_id);
+          return { campaign_contributions: { ...c, campaigns: { slug: k.slug, title: k.title, category: k.category } } };
+        });
+      } else if (path === '/functions/v1/campaign-contribute') {
+        mock.contributeCalls.push(body);
+        const k = mock.campaigns.find((x) => x.id === body.campaignId);
+        if (mock.verify === 'delay') [status, json] = [404, { error: { code: 'tx_not_found', message: 'The transaction was not found on Solana Devnet yet.' } }];
+        else if (mock.verify === 'refuse') [status, json] = [403, { error: { code: 'wrong_wallet', message: 'The transaction was not sent from your verified linked wallet.' } }];
+        else {
+          const prior = mock.contributions.find((c) => c.signature === body.signature);
+          let row = prior;
+          if (!prior) {
+            row = { id: `k${mock.contributions.length + 1}`, campaign_id: k.id, lamports: body.lamports, signature: body.signature, confirmation_status: 'confirmed', block_time: '2026-11-13T17:10:00Z', verified_at: '2026-11-13T17:10:05Z' };
+            mock.contributions.unshift(row);
+            k.raised_lamports += body.lamports;
+            k.contribution_count += 1;
+          }
+          [status, json] = [prior ? 200 : 201, { created: !prior, contribution: row, campaign: { raised_lamports: k.raised_lamports, contribution_count: k.contribution_count } }];
+        }
       } else if (path === '/functions/v1/wallet-unlink') {
         mock.unlink.push(body);
         mock.linked = null;
@@ -1604,7 +1686,7 @@ await section('25 ClubFund', async () => {
       });
     };
     const FAKE_WALLET = `(() => {
-      const account = { address: ${JSON.stringify(ADDRESS)}, publicKey: new Uint8Array(32), chains: ['solana:devnet'], features: ['solana:signMessage'] };
+      const account = { address: ${JSON.stringify(ADDRESS)}, publicKey: new Uint8Array(32), chains: ['solana:devnet'], features: ['solana:signMessage', 'solana:signTransaction'] };
       const flag = (k) => localStorage.getItem('test:' + k);
       const wallet = {
         version: '1.0.0', name: 'Test Wallet', icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=',
@@ -1613,7 +1695,7 @@ await section('25 ClubFund', async () => {
           'standard:connect': { version: '1.0.0', connect: async (input) => {
             if (flag('reject') === 'connect') throw Object.assign(new Error('User rejected the request.'), { code: 4001 });
             if (input?.silent && !flag('authorized')) return { accounts: [] };
-            localStorage.setItem('test:authorized', '1'); wallet.accounts = [account]; return { accounts: [account] };
+            localStorage.setItem('test:authorized', '1'); const acct = { ...account, address: flag('account') || account.address }; wallet.accounts = [acct]; return { accounts: [acct] };
           } },
           'standard:disconnect': { version: '1.0.0', disconnect: async () => { wallet.accounts = []; localStorage.removeItem('test:authorized'); } },
           'standard:events': { version: '1.0.0', on: () => () => {} },
@@ -1621,6 +1703,15 @@ await section('25 ClubFund', async () => {
             if (flag('reject') === 'sign') throw Object.assign(new Error('User rejected the request.'), { code: 4001 });
             window.__signed = new TextDecoder().decode(message);
             return [{ signedMessage: message, signature: new Uint8Array(64).fill(7) }];
+          } },
+          'solana:signTransaction': { version: '1.0.0', supportedTransactionVersions: ['legacy'], signTransaction: async ({ transaction, chain }) => {
+            if (flag('reject') === 'tx') throw Object.assign(new Error('User rejected the request.'), { code: 4001 });
+            window.__txChain = chain;
+            window.__txCount = (window.__txCount || 0) + 1;
+            const out = new Uint8Array(transaction);
+            out.fill(16 + window.__txCount + Number(localStorage.getItem('test:txSeq') || 0), 1, 65);
+            localStorage.setItem('test:txSeq', String(Number(localStorage.getItem('test:txSeq') || 0) + 1));
+            return [{ signedTransaction: out }];
           } },
         },
       };
@@ -1632,10 +1723,10 @@ await section('25 ClubFund', async () => {
 
     const tab = await json(`/json/new?about:blank`, 'PUT');
     const t = await connect(tab.webSocketDebuggerUrl, (m, call) => {
-      if (m.method === 'Fetch.requestPaused') void respond(m.params, call);
+      if (m.method === 'Fetch.requestPaused') void (m.params.request.url.includes('/__devnet') ? respondDevnet : respond)(m.params, call);
       if (m.method === 'Runtime.exceptionThrown') consoleIssues.add('CLUBFUND EXCEPTION ' + (m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text).slice(0, 200));
     });
-    await t.call('Fetch.enable', { patterns: [{ urlPattern: '*/__supabase/*', requestStage: 'Request' }] });
+    await t.call('Fetch.enable', { patterns: [{ urlPattern: '*/__supabase/*', requestStage: 'Request' }, { urlPattern: '*/__devnet*', requestStage: 'Request' }] });
     await t.call('Page.addScriptToEvaluateOnNewDocument', { source: FAKE_WALLET });
     await t.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
     const evT = (expr) => evalIn(t.call, expr);
@@ -1711,15 +1802,140 @@ await section('25 ClubFund', async () => {
     const signed = await evT(`return window.__signed`);
     check(A, 'wallet signed exactly the server challenge (no email inside)', signed === mock.challenge.message && !signed.includes('@'));
     check(A, 'link calls carry the session token, not a user id', mock.requests.filter((r) => r.path.startsWith('/functions/')).every((r) => /^Bearer /.test(r.auth ?? '') && !('userId' in (r.body ?? {})) && !('email' in (r.body ?? {}))));
-    tx = await text();
-    check(A, 'ClubFund landing: three upcoming Devnet categories, no real money', ['Support a Club', 'Fund an Event', 'Charity Campaigns'].every((c) => tx.includes(c)) && tx.includes('test tokens that have no monetary value') && tx.includes('does not collect real money'));
     await go('/clubs/clubfund');
     check(A, 'verified link still shown after refresh', await waitT(`$('main').textContent.includes('Wallet linked')`));
+
+    // ---- Contributions: mocked Supabase + mocked Devnet RPC + test wallet. The real Devnet transfer is a manual test. ----
+    const X = 'X Contributions';
+    const L = JSON.stringify(DEVNET_LABEL);
+    await waitT(`$$('[data-testid=cf-campaign]').length === 4`);
+    tx = await text();
+    check(X, 'landing: required Devnet label and campaigns in three categories', tx.includes(DEVNET_LABEL) && ['Support a Club', 'Fund an Event', 'Charity Campaigns'].every((c) => tx.includes(c)) && (await evT(`return $$('[data-testid=cf-campaign]').length`)) === 4);
+    check(X, 'wallet panel: verified wallet, Devnet connected, real balance, official faucet', await waitT(`$('[data-testid=cf-network]')?.textContent.includes('Solana Devnet · connected') && $('[data-testid=cf-balance]').textContent.includes('1.5 SOL') && $('[data-testid=cf-connected-wallet]').textContent.includes('matches') && !!$('main a[href="https://faucet.solana.com"]')`));
+    await clickT(`byText('main [role=group] button', 'Fund an Event')`);
+    check(X, 'filter by category (shareable URL)', (await evT(`return $$('[data-testid=cf-campaign]').length === 1 && $('[data-testid=cf-campaign]').textContent.includes('Hackathons') && location.search === '?category=event'`)));
+    await clickT(`byText('main [role=group] button', 'All campaigns')`);
+    check(X, 'totals start at zero (nothing fabricated); unconfirmed recipient is not open', await evT(`const c = $$('[data-testid=cf-campaign]'); return c.length === 4 && c.every((x) => x.textContent.includes('0 verified transactions')) && c[0].textContent.includes('Not open yet') && c[1].textContent.includes('Open for Devnet contributions') && !!c[1].querySelector('[role=progressbar][aria-valuenow="0"]')`));
+    mock.campaignsMissing = true;
+    await go('/clubs/clubfund');
+    check(X, 'campaign database not set up: clear message', await waitT(`$('main').textContent.includes("campaign database isn't set up yet")`));
+    mock.campaignsMissing = false;
+
+    await go('/clubs/clubfund/campaigns/demo-club-competition-travel');
+    check(X, 'campaign without a confirmed recipient: contributions disabled', await waitT(`$('main').textContent.includes('Not configured yet') && byText('main button', 'Support This Campaign')?.disabled`));
+    await go('/clubs/clubfund/campaigns/no-such-campaign');
+    check(X, 'unknown campaign: not found', await waitT(`$('main').textContent.includes('Campaign not found')`));
+
+    await go('/clubs/clubfund/campaigns/demo-club-equipment');
+    await waitT(`!byText('main button', 'Support This Campaign')?.disabled`);
+    tx = await text();
+    check(X, 'campaign page: name, category, label, goal, recipient, status, empty history', tx.includes('Demo Club: Equipment & Supplies') && tx.includes('Support a Club') && tx.includes(DEVNET_LABEL) && tx.includes('of 3 Devnet SOL') && tx.includes(R_EQUIP) && tx.includes('Open for Devnet contributions') && tx.includes('No verified contributions yet') && tx.includes('not created, run or endorsed by any UMass organization'));
+    check(X, 'recipient Explorer link selects Devnet', await evT(`return $$('main a').some((a) => a.href === 'https://explorer.solana.com/address/${R_EQUIP}?cluster=devnet')`));
+    check(X, 'Support enabled for the verified, connected wallet', await evT(`return !byText('main button', 'Support This Campaign').disabled`));
+    const dlg = `$('[data-testid=cf-contribute-dialog]')`;
+    const inDlg = (label) => `byText('[data-testid=cf-contribute-dialog] button', ${JSON.stringify(label)})`;
+    await clickT(`byText('main button', 'Support This Campaign')`);
+    check(X, 'dialog: Devnet label, exact recipient, real balance', await waitT(`${dlg}.open && ${dlg}.textContent.includes(${L}) && $('[data-testid=cf-recipient]').textContent.trim() === ${JSON.stringify(R_EQUIP)} && ${dlg}.textContent.includes('1.5 SOL')`));
+    const amountMsg = async (v) => {
+      await evT(`typeInto($('[data-testid=cf-amount]'), ${JSON.stringify(v)}); return true`);
+      await clickT(inDlg('Review contribution'));
+      return evT(`return ${dlg}.querySelector('[role=alert]')?.textContent ?? ''`);
+    };
+    const msgs = [await amountMsg(''), await amountMsg('abc'), await amountMsg('0.0001'), await amountMsg('3'), await amountMsg('1.5')];
+    check(X, 'amount validation: empty, invalid, too small, too large, insufficient balance', msgs[0].includes('Enter an amount') && msgs[1].includes('Enter a number') && msgs[2].includes('smallest contribution') && msgs[3].includes('largest contribution') && msgs[4].includes('Not enough Devnet SOL'), JSON.stringify(msgs));
+    await amountMsg('0.05');
+    check(X, 'review: exact amount (SOL and integer lamports), from, to, fee', await waitT(`(() => { const r = $('[data-testid=cf-review]')?.textContent ?? ''; return r.includes('0.05 Devnet SOL') && r.includes('50,000,000 lamports') && r.includes(${JSON.stringify(R_EQUIP)}) && r.includes(${JSON.stringify(ADDRESS)}) && r.includes('0.000005 SOL') && r.includes('Solana Devnet'); })()`));
+    check(X, 'explicit confirmation required before the wallet is asked', await evT(`return ${inDlg('Approve in wallet')}.disabled && !window.__txCount`));
+    await evT(`$('[data-testid=cf-ack]').click(); return true`);
+
+    await evT(`localStorage.setItem('test:reject', 'tx'); return true`);
+    await clickT(inDlg('Approve in wallet'));
+    check(X, 'wallet rejects the transaction: nothing sent or recorded', (await waitT(`$('[data-testid=cf-result]')?.dataset.kind === 'declined'`)) && dn.sent.length === 0 && mock.contributeCalls.length === 0 && (await evT(`return ${dlg}.textContent.includes('Nothing was sent') && !${dlg}.textContent.includes('Contribution verified')`)));
+    await evT(`localStorage.removeItem('test:reject'); return true`);
+
+    dn.send = 'reject';
+    await clickT(inDlg('Try again'));
+    await clickT(inDlg('Approve in wallet'));
+    check(X, 'Devnet refuses (simulation: not enough SOL): nothing sent, nothing counted', (await waitT(`$('[data-testid=cf-result]')?.dataset.kind === 'not_sent'`)) && (await evT(`return ${dlg}.textContent.includes('Not enough Devnet SOL')`)) && mock.contributeCalls.length === 0);
+    dn.send = 'ok';
+
+    // Confirmed on chain, but the server cannot verify yet: never shown as a success; saved for later.
+    mock.verify = 'delay';
+    await clickT(inDlg('Try again'));
+    await clickT(inDlg('Approve in wallet'));
+    check(X, 'verification delayed: no success shown, signature kept to check later', (await waitT(`$('[data-testid=cf-result]')?.dataset.kind === 'verify_delayed'`, 25000)) && (await evT(`return !${dlg}.textContent.includes('Contribution verified') && !!byText('[data-testid=cf-contribute-dialog] button', 'Check again') && JSON.parse(localStorage.getItem('myclubs:clubfund:pending')).length === 1`)) && mock.campaigns[1].raised_lamports === 0);
+    check(X, 'one approval, one submission (never re-sent automatically)', dn.sent.length === 1 && (await evT(`return window.__txCount`)) === 2 && mock.contributeCalls.length === 4);
+    const sentTx = readSent(dn.sent[0]);
+    check(X, 'transaction built for Devnet: linked wallet to campaign recipient, exact lamports, campaign memo', sentTx.from === ADDRESS && sentTx.to === R_EQUIP && sentTx.lamports === 50_000_000n && sentTx.memo === 'MyClubs ClubFund Devnet demo: demo-club-equipment' && (await evT(`return window.__txChain`)) === 'solana:devnet');
+    check(X, 'server asked to verify the exact signature and integer lamports, not a browser-made claim of success', mock.contributeCalls.every((c) => c.signature === sentTx.signature && c.lamports === 50_000_000 && c.campaignId === mock.campaigns[1].id && Object.keys(c).sort().join() === 'campaignId,lamports,signature'));
+    await clickT(inDlg('Close'));
+    await go('/clubs/clubfund/campaigns/demo-club-equipment');
+    check(X, 'after refresh: unverified contribution found; Support blocked until it is resolved', await waitT(`$('main').textContent.includes("hasn't been verified yet") && byText('main button', 'Support This Campaign').disabled`));
+    mock.verify = 'ok';
+    await clickT(`byText('main button', 'Check its status')`);
+    check(X, 'checked again: verified on the server, then shown as a success with an Explorer link', await waitT(`$('[data-testid=cf-result]')?.dataset.kind === 'verified' && ${dlg}.textContent.includes('Contribution verified') && ${dlg}.textContent.includes(${L}) && $$('[data-testid=cf-contribute-dialog] a').some((a) => a.href === 'https://explorer.solana.com/tx/${sentTx.signature}?cluster=devnet')`, 15000));
+    check(X, 'no second transaction was created while checking', dn.sent.length === 1);
+    await clickT(inDlg('Done'));
+    check(X, 'campaign total and history update from the verified record', await waitT(`$('[data-testid=cf-raised]').textContent === '0.05' && $('main').textContent.includes('1 verified transaction') && $$('[data-testid=cf-history] li').length === 1 && $('[data-testid=cf-history]').textContent.includes('0.05 Devnet SOL') && $$('[data-testid=cf-history] a').some((a) => a.href.endsWith('?cluster=devnet'))`));
+
+    // Failures after approval.
+    await clickT(`byText('main button', 'Support This Campaign')`);
+    await evT(`typeInto($('[data-testid=cf-amount]'), '0.01'); return true`);
+    await clickT(inDlg('Review contribution'));
+    await evT(`$('[data-testid=cf-ack]').click(); return true`);
+    dn.status = 'failed';
+    await clickT(inDlg('Approve in wallet'));
+    check(X, 'transaction failed on Devnet: not counted', (await waitT(`$('[data-testid=cf-result]')?.dataset.kind === 'failed'`)) && mock.contributions.length === 1);
+    dn.status = 'none';
+    dn.send = 'drop';
+    dn.blockHeight = 2000;
+    const before = dn.sent.length;
+    await clickT(inDlg('Try again'));
+    await clickT(inDlg('Approve in wallet'));
+    check(X, 'connection drops while sending: status checked, not re-sent; expired means nothing moved', (await waitT(`$('[data-testid=cf-result]')?.dataset.kind === 'expired'`, 10000)) && dn.sent.length === before + 1 && mock.contributions.length === 1);
+    Object.assign(dn, { status: 'confirmed', send: 'ok', blockHeight: 900 });
+    mock.verify = 'refuse';
+    await clickT(inDlg('Try again'));
+    await clickT(inDlg('Approve in wallet'));
+    check(X, 'server refuses the transaction: shown as not counted', (await waitT(`$('[data-testid=cf-result]')?.dataset.kind === 'refused' && ${dlg}.textContent.includes('Not counted')`)) && mock.contributions.length === 1);
+    mock.verify = 'ok';
+    await t.call('Accessibility.enable');
+    const ax = (await t.call('Accessibility.getFullAXTree')).result.nodes.filter((x) => !x.ignored && ['button', 'link', 'textbox', 'checkbox'].includes(x.role?.value) && !(x.name?.value ?? '').trim());
+    check(X, 'contribution dialog and campaign page: every control has an accessible name', ax.length === 0, ax.map((x) => x.role.value).join(','));
+    await clickT(inDlg('Close'));
+
+    await go('/clubs/clubfund');
+    check(X, 'my verified contributions: amount, campaign, status and Explorer link', await waitT(`(() => { const h = $('#cf-mine')?.parentElement.querySelector('[data-testid=cf-history]'); return !!h && h.textContent.includes('0.05 Devnet SOL') && h.textContent.includes('Demo Club: Equipment & Supplies') && h.textContent.includes('Verified') && $$('a', h).some((a) => a.href.includes('/tx/') && a.href.endsWith('?cluster=devnet')); })()`));
+
+    // Wrong wallet, wrong network, Devnet down.
+    await evT(`localStorage.setItem('test:account', ${JSON.stringify(R_FOOD)}); return true`);
+    await go('/clubs/clubfund/campaigns/demo-club-equipment');
+    check(X, 'different wallet connected: warned, contributions blocked', await waitT(`$$('main [role=alert]').some((e) => e.textContent.includes("isn't the wallet verified for your account")) && byText('main button', 'Support This Campaign').disabled`));
+    await evT(`localStorage.removeItem('test:account'); return true`);
+    dn.genesis = '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';
+    await go('/clubs/clubfund/campaigns/demo-club-equipment');
+    check(X, 'endpoint is not Devnet (Mainnet genesis): contributions turned off', await waitT(`$('[data-testid=cf-network]')?.textContent.includes('Not Devnet') && byText('main button', 'Support This Campaign').disabled`));
+    dn.genesis = DEVNET_GENESIS;
+    dn.down = true;
+    await go('/clubs/clubfund/campaigns/demo-club-equipment');
+    check(X, 'Devnet unreachable: clear message, contributions blocked', await waitT(`$('[data-testid=cf-network]')?.textContent.includes("Can't reach Solana Devnet") && byText('main button', 'Support This Campaign').disabled`));
+    dn.down = false;
+
+    // Contextual entry points, only where a demo campaign is attached; Follow and Apply untouched.
+    await go('/clubs/events/ev-hack-workshop');
+    check(X, 'sample event with a demo campaign: Help Fund This Event', await waitT(`byText('main a', 'Help Fund This Event')?.getAttribute('href') === '/clubs/clubfund/campaigns/demo-event-hackathon-workshop'`));
+    await go('/clubs/events/ev-career-fair');
+    check(X, 'event without a campaign: no fundraising link', (await evT(`return !$('[data-testid=cf-event-entry]') && !!$('main h1')`)));
+    await go('/clubs/discover/vietnamesestudentassociation');
+    check(X, 'organization with a demo campaign: Support This Club beside Follow', await waitT(`byText('main a', 'Support This Club')?.getAttribute('href') === '/clubs/clubfund/campaigns/demo-club-equipment' && !!$('main header button[aria-pressed]')`));
+    await go('/clubs/discover/chessclub');
+    check(X, 'other organizations: no fundraising button', (await evT(`return !$('[data-testid=cf-org-entry]') && !!$('main header button[aria-pressed]')`)));
 
     // Wallet settings: disconnect is not unlink; unlink needs the wallet's signature.
     await go('/clubs/clubfund/settings');
     tx = await text();
     check(A, 'settings after refresh: email, linked wallet, wallet reconnected silently', tx.includes('UMass email verified: jdoe@umass.edu') && tx.includes(ADDRESS) && (await waitT(`$('main').textContent.includes('Test Wallet connected')`)));
+    check(A, 'settings: verified wallet Devnet balance and faucet', await waitT(`$('[data-testid=cf-balance]')?.textContent.includes('1.5 SOL') && !!$('main a[href="https://faucet.solana.com"]')`));
     await clickT(`byText('main button', 'Disconnect wallet')`);
     check(A, 'disconnect keeps the verified link', (await waitT(`!!byText('main button', 'Connect Test Wallet')`)) && mock.linked !== null && mock.unlink.length === 0 && (await evT(`return $('main').textContent.includes(${JSON.stringify(ADDRESS)})`)));
     check(A, 'unlink needs the linked wallet (or a fresh email code)', await evT(`return !byText('main button', 'Sign and unlink') && !!byText('main button', 'Lost access to this wallet?')`));
@@ -1734,7 +1950,7 @@ await section('25 ClubFund', async () => {
     const unnamed = result.nodes.filter((x) => !x.ignored && ['button', 'link', 'textbox', 'combobox'].includes(x.role?.value) && !(x.name?.value ?? '').trim());
     check(A, 'settings page: every control has an accessible name', unnamed.length === 0, unnamed.map((x) => x.role.value).join(','));
     await t.call('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
-    for (const p of ['/clubs/clubfund', '/clubs/clubfund/settings']) {
+    for (const p of ['/clubs/clubfund', '/clubs/clubfund/settings', '/clubs/clubfund/campaigns/demo-club-equipment']) {
       await go(p);
       check(A, `no horizontal scroll at 375px: ${p}`, await evT(`return document.documentElement.scrollWidth <= 375`));
     }

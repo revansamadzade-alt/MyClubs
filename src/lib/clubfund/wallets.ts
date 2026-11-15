@@ -1,5 +1,6 @@
 // Solana wallets through the Wallet Standard (Phantom, Solflare, Backpack and other compatible wallets register
-// themselves). We only ever ask a wallet to connect and to sign a text message: never a transaction, never a secret.
+// themselves). We ask a wallet to connect, to sign a text message (proving ownership), and, only after the student
+// confirms a contribution, to approve one Devnet transfer. Never a secret, never an automatic signature.
 import { getWallets } from '@wallet-standard/app';
 import type { Wallet, WalletAccount } from '@wallet-standard/base';
 import {
@@ -10,7 +11,16 @@ import {
   type StandardDisconnectFeature,
   type StandardEventsFeature,
 } from '@wallet-standard/features';
-import { SolanaSignMessage, type SolanaSignMessageFeature } from '@solana/wallet-standard-features';
+import {
+  SolanaSignAndSendTransaction,
+  SolanaSignMessage,
+  SolanaSignTransaction,
+  type SolanaSignAndSendTransactionFeature,
+  type SolanaSignMessageFeature,
+  type SolanaSignTransactionFeature,
+} from '@solana/wallet-standard-features';
+import { base58 } from '@scure/base';
+import { DEVNET_CHAIN } from '../../../supabase/functions/_shared/solana';
 
 export type { Wallet, WalletAccount };
 
@@ -45,12 +55,26 @@ export class WalletProblem extends Error {
   }
 }
 
-function explain(e: unknown, action: 'connect' | 'sign'): WalletProblem {
+function explain(e: unknown, action: 'connect' | 'sign' | 'transaction'): WalletProblem {
   const msg = e instanceof Error ? e.message : String(e);
   const code = (e as { code?: number })?.code;
   if (code === 4001 || /reject|denied|declin|cancel/i.test(msg))
-    return new WalletProblem('rejected', action === 'connect' ? 'You cancelled the connection in your wallet.' : 'You cancelled the signature in your wallet. Nothing was linked.');
-  return new WalletProblem('failed', action === 'connect' ? "The wallet didn't connect. Unlock it and try again." : "The wallet couldn't sign the message. Try again.");
+    return new WalletProblem(
+      'rejected',
+      action === 'connect'
+        ? 'You cancelled the connection in your wallet.'
+        : action === 'sign'
+          ? 'You cancelled the signature in your wallet. Nothing was linked.'
+          : 'You declined the transaction in your wallet. Nothing was sent.',
+    );
+  return new WalletProblem(
+    'failed',
+    action === 'connect'
+      ? "The wallet didn't connect. Unlock it and try again."
+      : action === 'sign'
+        ? "The wallet couldn't sign the message. Try again."
+        : "The wallet couldn't sign the transaction. Nothing was sent.",
+  );
 }
 
 /** Connects (or silently reconnects) and returns the wallet's first Solana account. */
@@ -115,3 +139,38 @@ export async function signMessage(wallet: Wallet, account: WalletAccount, messag
 }
 
 export const shortAddress = (a: string) => (a.length > 12 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a);
+
+/** The wallet can approve transactions (sign only, or sign and send). */
+export function canApproveTransactions(w: Wallet): boolean {
+  return SolanaSignTransaction in w.features || SolanaSignAndSendTransaction in w.features;
+}
+
+/**
+ * Asks the wallet to approve one transaction. Wallets that can sign without sending return the signed bytes, and
+ * MyClubs submits them to Devnet itself. Wallets that only sign-and-send submit it themselves and return the signature.
+ */
+export async function approveTransaction(
+  wallet: Wallet,
+  account: WalletAccount,
+  transaction: Uint8Array,
+): Promise<{ signedTransaction: Uint8Array } | { sentSignature: string }> {
+  const signOnly = (wallet.features as Partial<SolanaSignTransactionFeature>)[SolanaSignTransaction];
+  const signAndSend = (wallet.features as Partial<SolanaSignAndSendTransactionFeature>)[SolanaSignAndSendTransaction];
+  if (!signOnly && !signAndSend) throw new WalletProblem('unsupported', "This wallet can't approve Solana transactions. Use Phantom or Solflare.");
+  try {
+    if (signOnly) {
+      const [out] = await signOnly.signTransaction({ account, transaction, chain: DEVNET_CHAIN });
+      if (!out?.signedTransaction) throw new Error('no transaction returned');
+      return { signedTransaction: out.signedTransaction };
+    }
+    const [out] = await signAndSend!.signAndSendTransaction({ account, transaction, chain: DEVNET_CHAIN });
+    if (!out?.signature) throw new Error('no signature returned');
+    return { sentSignature: base58.encode(out.signature) };
+  } catch (e) {
+    const problem = e instanceof WalletProblem ? e : explain(e, 'transaction');
+    // A sign-and-send wallet may have submitted the transaction before reporting an error.
+    if (!signOnly && problem.code === 'failed')
+      throw new WalletProblem('failed', "Your wallet reported an error. Check its activity list before trying again, so you don't send twice.");
+    throw problem;
+  }
+}

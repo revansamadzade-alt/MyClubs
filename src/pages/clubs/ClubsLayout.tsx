@@ -35,8 +35,11 @@ function crumbsFor(pathname: string): { label: string; to?: string }[] {
               : orgFor(id)?.name
             : section === 'clubfund' && id === 'settings'
               ? 'Wallet settings'
-              : undefined;
-    crumbs.push({ label: name ?? 'Not found', to: sub ? `/clubs/${section}/${id}` : undefined });
+              : section === 'clubfund' && id === 'campaigns' && sub
+                ? 'Campaign'
+                : undefined;
+    if (section === 'clubfund' && id === 'campaigns') crumbs.push({ label: name ?? 'Not found' });
+    else crumbs.push({ label: name ?? 'Not found', to: sub ? `/clubs/${section}/${id}` : undefined });
     if (sub === 'apply') crumbs.push({ label: 'Apply' });
   }
   return crumbs;

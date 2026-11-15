@@ -22,6 +22,7 @@ const ApplicantProfilePage = lazy(() => import('./pages/clubs/ApplicantProfile')
 const ClubFundLayout = lazy(() => import('./pages/clubs/clubfund/ClubFundLayout'));
 const ClubFundHome = lazy(() => import('./pages/clubs/clubfund/ClubFundHome'));
 const WalletSettings = lazy(() => import('./pages/clubs/clubfund/WalletSettings'));
+const CampaignPage = lazy(() => import('./pages/clubs/clubfund/CampaignPage'));
 
 function Loading() {
   return (
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="clubfund" element={page(<ClubFundLayout />)}>
             <Route index element={page(<ClubFundHome />)} />
             <Route path="settings" element={page(<WalletSettings />)} />
+            <Route path="campaigns/:slug" element={page(<CampaignPage />)} />
           </Route>
         </Route>
         {NAV_ITEMS.filter((n) => n.prototype).map((item) => (

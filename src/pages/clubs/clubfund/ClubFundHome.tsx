@@ -1,13 +1,17 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { BadgeCheck, CalendarHeart, HandCoins, HeartHandshake, MailCheck, PenLine, Wallet as WalletIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { BadgeCheck, MailCheck, PenLine, Wallet as WalletIcon } from 'lucide-react';
 import { requestChallenge, submitLink, ApiProblem } from '../../../lib/clubfund/api';
+import { CATEGORY_LABEL, listCampaigns, listMyContributions, type Campaign, type CampaignCategory, type MyContribution } from '../../../lib/clubfund/campaigns';
+import { readPending } from '../../../lib/clubfund/flow';
+import { formatSol } from '../../../lib/clubfund/lamports';
 import { WalletProblem, shortAddress, signMessage } from '../../../lib/clubfund/wallets';
-import { PageHeader, SampleBadge } from '../../../components/ui';
+import { ChipGroup, PageHeader } from '../../../components/ui';
 import { useTitle } from '../../../hooks/useTitle';
 import { cx } from '../../../lib/cx';
 import { useClubFund } from './state';
 import { Busy, EmailVerification, NotConfigured, Notice, PRIVACY_STATEMENT, WalletPicker, fmtWhen } from './parts';
+import { CampaignCard, ContributionList, DevnetNotice, PUBLIC_CHAIN_NOTE, WalletPanel, useDevnetBalance } from './campaignParts';
 
 const SSO_NOTE =
   'Verifying your email proves you can open that @umass.edu inbox. It is not UMass single sign-on and does not confirm current enrollment.';
@@ -45,8 +49,8 @@ function About() {
         What is ClubFund?
       </h2>
       <p className="mt-1 text-sm text-ink">
-        ClubFund will let UMass students support clubs, events and charity campaigns on Solana. First, it ties your MyClubs account to a verified
-        @umass.edu email and a Solana wallet you prove you control. Fundraising itself is not live: future demos run on Solana Devnet with test
+        ClubFund lets UMass students try fundraising for clubs, events and charity causes on Solana Devnet. It ties your MyClubs account to a
+        verified @umass.edu email and a Solana wallet you prove you control. Every campaign is a fictional demo, and contributions use Devnet test
         tokens that have no monetary value.
       </p>
       <p className="mt-2 text-xs text-ink-soft">{SSO_NOTE}</p>
@@ -128,15 +132,10 @@ function LinkWallet() {
   );
 }
 
-const CAMPAIGNS = [
-  { icon: HeartHandshake, title: 'Support a Club', text: 'Chip in to a student organization you care about.' },
-  { icon: CalendarHeart, title: 'Fund an Event', text: 'Back a specific campus event and see its goal and progress.' },
-  { icon: HandCoins, title: 'Charity Campaigns', text: 'Join charity drives organized by student groups.' },
-];
-
 function Linked() {
   const cf = useClubFund();
   const link = cf.link!;
+  const devnet = useDevnetBalance(link.wallet_address);
   return (
     <>
       <section aria-labelledby="cf-linked" className="card p-5">
@@ -153,10 +152,6 @@ function Linked() {
             {shortAddress(link.wallet_address)}
             <span className="sr-only"> (full address {link.wallet_address})</span>
           </dd>
-          <dt className="text-ink-soft">Network</dt>
-          <dd className="text-ink">Solana Devnet</dd>
-          <dt className="text-ink-soft">Linked</dt>
-          <dd className="text-ink">{fmtWhen(link.linked_at)}</dd>
           <dt className="text-ink-soft">Ownership</dt>
           <dd className="text-ink">Verified by wallet signature, {fmtWhen(link.verified_at)}</dd>
         </dl>
@@ -164,29 +159,129 @@ function Linked() {
           Manage wallet
         </Link>
       </section>
+      <WalletPanel devnet={devnet} />
+    </>
+  );
+}
 
-      <section aria-labelledby="cf-campaigns">
-        <h2 id="cf-campaigns" className="section-title">
-          ClubFund
-        </h2>
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {CAMPAIGNS.map((c) => (
-            <li key={c.title} className="card flex flex-col p-4">
-              <c.icon size={24} aria-hidden className="text-umass" />
-              <h3 className="mt-2 font-bold text-ink">{c.title}</h3>
-              <p className="mt-1 flex-1 text-sm text-ink-soft">{c.text}</p>
-              <SampleBadge label="Upcoming · Devnet demo" className="mt-3 self-start" />
-            </li>
-          ))}
-        </ul>
-        <div className="mt-4">
-          <Notice tone="info" role="note">
-            Campaigns are not live. Future demos will run on Solana Devnet with test tokens that have no monetary value. ClubFund does not collect
-            real money or donations, and nothing here is tax-deductible.
+type Filter = 'all' | CampaignCategory;
+
+function CampaignBrowser() {
+  const [params, setParams] = useSearchParams();
+  const raw = params.get('category');
+  const filter: Filter = raw === 'club' || raw === 'event' || raw === 'charity' ? raw : 'all';
+  const [items, setItems] = useState<Campaign[] | null>(null);
+  const [error, setError] = useState<ApiProblem | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    setError(null);
+    listCampaigns()
+      .then((c) => live && setItems(c))
+      .catch((e) => live && setError(e instanceof ApiProblem ? e : new ApiProblem('server_error', "Couldn't load campaigns.")));
+    return () => {
+      live = false;
+    };
+  }, [tick]);
+
+  const count = (f: Filter) => (items ?? []).filter((c) => f === 'all' || c.category === f).length;
+  const shown = (items ?? []).filter((c) => filter === 'all' || c.category === filter);
+  return (
+    <section aria-labelledby="cf-campaigns">
+      <h2 id="cf-campaigns" className="section-title">
+        Demo campaigns
+      </h2>
+      {error ? (
+        <Notice tone={error.code === 'not_set_up' ? 'warn' : 'error'} role="alert">
+          <p>{error.message}</p>
+          {error.code !== 'not_set_up' && (
+            <button type="button" className="btn btn-secondary btn-sm mt-2" onClick={() => setTick((t) => t + 1)}>
+              Try again
+            </button>
+          )}
+        </Notice>
+      ) : !items ? (
+        <Busy label="Loading campaigns…" />
+      ) : (
+        <>
+          <ChipGroup
+            label="Campaign category"
+            value={filter}
+            onChange={(v) => setParams(v === 'all' ? {} : { category: v }, { replace: true })}
+            options={[
+              { value: 'all' as Filter, label: 'All campaigns', count: count('all') },
+              ...(Object.keys(CATEGORY_LABEL) as CampaignCategory[]).map((k) => ({ value: k as Filter, label: CATEGORY_LABEL[k], count: count(k) })),
+            ]}
+          />
+          {shown.length ? (
+            <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {shown.map((c) => (
+                <CampaignCard key={c.id} campaign={c} />
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-ink-soft">No campaigns in this category yet.</p>
+          )}
+          <p className="mt-3 text-xs text-ink-soft">
+            Totals count only contributions ClubFund verified on Solana Devnet. Campaigns are fictional and not affiliated with any UMass organization or charity.
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+function MyContributions() {
+  const cf = useClubFund();
+  const [items, setItems] = useState<MyContribution[] | null>(null);
+  const [error, setError] = useState('');
+  const pending = readPending().filter((p) => p.userId === cf.session?.user.id);
+
+  useEffect(() => {
+    let live = true;
+    listMyContributions()
+      .then((c) => live && setItems(c))
+      .catch((e) => live && setError(e instanceof ApiProblem ? e.message : "Couldn't load your contributions."));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  return (
+    <section aria-labelledby="cf-mine">
+      <h2 id="cf-mine" className="section-title">
+        Your verified contributions
+      </h2>
+      {pending.length > 0 && (
+        <div className="mb-3">
+          <Notice tone="warn" role="status">
+            <p className="font-bold">Waiting for verification</p>
+            <ul className="mt-1 space-y-1">
+              {pending.map((p) => (
+                <li key={p.signature}>
+                  {formatSol(p.lamports)} Devnet SOL ·{' '}
+                  <Link to={'/clubs/clubfund/campaigns/' + p.slug} className="text-link underline">
+                    check its status
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </Notice>
         </div>
-      </section>
-    </>
+      )}
+      {error ? (
+        <p role="alert" className="text-sm text-badge">
+          {error}
+        </p>
+      ) : !items ? (
+        <Busy label="Loading your contributions…" />
+      ) : items.length ? (
+        <ContributionList items={items.map((c) => ({ ...c, campaignTitle: c.campaign?.title, campaignSlug: c.campaign?.slug }))} showCampaign />
+      ) : (
+        <p className="text-sm text-ink-soft">No verified contributions yet. Pick a demo campaign above to try one with Devnet SOL.</p>
+      )}
+    </section>
   );
 }
 
@@ -248,7 +343,7 @@ export default function ClubFundHome() {
     <>
       <PageHeader
         title="ClubFund"
-        description="Verify your UMass email and link a Solana wallet you control. Your email is never put on the blockchain."
+        description="Support fictional demo campaigns with Solana Devnet test tokens. Verify your UMass email and link a Solana wallet you control to contribute."
         actions={
           cf.session ? (
             <Link to="/clubs/clubfund/settings" className="btn btn-secondary">
@@ -257,9 +352,14 @@ export default function ClubFundHome() {
           ) : undefined
         }
       />
-      <div className="max-w-3xl space-y-5">
-        {body}
-        <p className="text-xs text-ink-soft">{PRIVACY_STATEMENT} Transactions on Solana, including Devnet, are publicly visible.</p>
+      <div className="max-w-5xl space-y-6">
+        <DevnetNotice />
+        <div className="max-w-3xl space-y-5">{body}</div>
+        {cf.configured && <CampaignBrowser />}
+        {cf.configured && cf.link && <MyContributions />}
+        <p className="text-xs text-ink-soft">
+          {PRIVACY_STATEMENT} {PUBLIC_CHAIN_NOTE}
+        </p>
       </div>
     </>
   );

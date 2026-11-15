@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
 import { ApplyButton, MembershipInfo, MembershipTag } from '../../components/Applications';
-import { ArrowLeft, BadgeCheck, CalendarClock, Clock, ExternalLink, Info, MapPin, SearchX } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, CalendarClock, Clock, ExternalLink, HandCoins, Info, MapPin, SearchX } from 'lucide-react';
 import { CLUB_BY_ID, campusPulseLinks } from '../../data/clubs';
 import { EVENTS } from '../../data/events';
 import { DOW_PLURAL, fmtDate, fmtTime, hhmmRange } from '../../lib/dates';
@@ -11,6 +11,7 @@ import { EventCard } from '../../components/EventCard';
 import { Reviews } from '../../components/Reviews';
 import { CategoryTag, ClubAvatar, EmptyState, FollowButton } from '../../components/ui';
 import { useTitle } from '../../hooks/useTitle';
+import { useDemoCampaign } from '../../lib/clubfund/entryPoints';
 
 export default function ClubProfile() {
   const { clubId = '' } = useParams();
@@ -20,6 +21,7 @@ export default function ClubProfile() {
   const { getApplication, saveApplication } = useStore();
   const backTo = `/clubs/discover${(state as { discoverSearch?: string } | null)?.discoverSearch ?? ''}`;
   useTitle(club?.name ?? 'Club not found');
+  const demoCampaign = useDemoCampaign('org', club?.id);
 
   if (!club) {
     return (
@@ -157,6 +159,19 @@ export default function ClubProfile() {
               )}
             </div>
           </div>
+          {demoCampaign && (
+            <div className="card p-4" data-testid="cf-org-entry">
+              <h2 className="mb-1 flex items-center gap-2 font-bold">
+                <HandCoins size={18} aria-hidden className="text-umass" /> ClubFund demo
+              </h2>
+              <p className="text-sm text-ink-soft">
+                A Solana Devnet demo campaign is attached to this organization. Test tokens only; no real money is collected.
+              </p>
+              <Link to={`/clubs/clubfund/campaigns/${demoCampaign.slug}`} className="btn btn-secondary btn-sm mt-3">
+                Support This Club
+              </Link>
+            </div>
+          )}
           <div className="card p-4">
             <h2 className="mb-3 flex items-center gap-2 font-bold">
               <CalendarClock size={18} aria-hidden className="text-umass" /> Meetings

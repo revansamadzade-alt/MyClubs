@@ -7,6 +7,7 @@ import { PageHeader } from '../../../components/ui';
 import { useTitle } from '../../../hooks/useTitle';
 import { useClubFund } from './state';
 import { Busy, EmailVerification, NotConfigured, Notice, PRIVACY_STATEMENT, WalletPicker, fmtWhen } from './parts';
+import { DevnetBalanceCard, PUBLIC_CHAIN_NOTE } from './campaignParts';
 
 function Unlink() {
   const cf = useClubFund();
@@ -172,6 +173,7 @@ export default function WalletSettings() {
           )}
         </section>
 
+        {link && cf.linkStatus === 'ready' && <DevnetBalanceCard address={link.wallet_address} />}
         {link && cf.linkStatus === 'ready' && <Unlink />}
       </>
     );
@@ -188,8 +190,8 @@ export default function WalletSettings() {
           </h2>
           <p className="mt-1">{PRIVACY_STATEMENT}</p>
           <p className="mt-1 text-ink-soft">
-            Your wallet address is visible to anyone on Solana, and so are any future transactions. Unlinking deletes the email-to-wallet
-            association from our database; signing out deletes this browser's session.
+            {PUBLIC_CHAIN_NOTE} Unlinking deletes the email-to-wallet association from our database (verified contributions stay counted, as they
+            are on the blockchain); signing out deletes this browser's session.
           </p>
         </section>
       </div>

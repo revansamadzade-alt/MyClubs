@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, BadgeCheck, CalendarCheck2, CalendarX2, Clock, ExternalLink, Info, MapPin, TriangleAlert, UsersRound } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, CalendarCheck2, CalendarX2, Clock, ExternalLink, HandCoins, Info, MapPin, TriangleAlert, UsersRound } from 'lucide-react';
 import { EVENT_BY_ID } from '../../data/events';
 import { CLUB_BY_ID } from '../../data/clubs';
 import { useStore } from '../../context/StoreContext';
@@ -7,12 +7,14 @@ import { fmtLongDate, fmtRange } from '../../lib/dates';
 import { KIND_META, conflictsForEvent } from '../../lib/schedule';
 import { CategoryTag, DateTile, EmptyState, FollowButton, SampleBadge, SaveEventButton } from '../../components/ui';
 import { useTitle } from '../../hooks/useTitle';
+import { useDemoCampaign } from '../../lib/clubfund/entryPoints';
 
 export default function EventDetail() {
   const { eventId = '' } = useParams();
   const event = EVENT_BY_ID[eventId];
   const { followed, saved } = useStore();
   useTitle(event?.title ?? 'Event not found');
+  const demoCampaign = useDemoCampaign('event', event?.id);
 
   if (!event) {
     return (
@@ -133,7 +135,20 @@ export default function EventDetail() {
           )}
         </div>
 
-        <aside aria-labelledby="schedule-check">
+        <aside aria-labelledby="schedule-check" className="space-y-4">
+          {demoCampaign && (
+            <div className="card p-4" data-testid="cf-event-entry">
+              <h2 className="mb-1 flex items-center gap-2 font-bold">
+                <HandCoins size={18} aria-hidden className="text-umass" /> ClubFund demo
+              </h2>
+              <p className="text-sm text-ink-soft">
+                A fictional Solana Devnet demo campaign is attached to this sample event. Test tokens only; no real money.
+              </p>
+              <Link to={`/clubs/clubfund/campaigns/${demoCampaign.slug}`} className="btn btn-secondary btn-sm mt-3">
+                Help Fund This Event
+              </Link>
+            </div>
+          )}
           <div className="card p-4">
             <h2 id="schedule-check" className="mb-3 font-bold">
               Schedule check

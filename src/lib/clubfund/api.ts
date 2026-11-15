@@ -32,7 +32,7 @@ export async function fetchLink(): Promise<WalletLink | null> {
   return data as WalletLink | null;
 }
 
-async function call<T>(fn: string, body: Record<string, unknown>): Promise<T> {
+export async function call<T>(fn: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase().functions.invoke(fn, { body });
   if (!error) return data as T;
   if (error instanceof FunctionsHttpError) {
