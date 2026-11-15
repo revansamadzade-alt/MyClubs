@@ -115,7 +115,7 @@ Entry points elsewhere in MyClubs: **ClubFund** in the MyClubs navigation; **Hel
 page and **Support This Club** on an organization profile appear only when an active demo campaign names that event
 (`related_event_id`) or organization (`related_org_id`). No real organization is linked by default.
 
-## Migrations (awaiting approval — not applied)
+## Migrations (applied to `zanhvwuvuvfxetqkojbw` on 2026-11-14 with `supabase db push`)
 
 **`20261114120000_clubfund_wallet_links.sql`**: tables `wallet_links` and `wallet_challenges`, RLS (owners read their
 own link with a @umass.edu JWT), functions `is_umass_email`, `hook_before_user_created_umass_only` (execute:
@@ -141,16 +141,14 @@ No destructive changes to existing objects.
 
 ## Manual setup (owner)
 
-Do not paste secrets into chat. Steps 1–4 were proposed for approval; the Supabase tool prompt declined the migration,
-so nothing has been applied remotely yet.
+Do not paste secrets into chat. Steps 1 and 2 are done (2026-11-14) with the pinned CLI, `npx supabase@2.122.0`, after
+`supabase login` and `supabase link --project-ref zanhvwuvuvfxetqkojbw`.
 
-1. **Apply the migrations**, in order (either way):
-   - approve the Supabase MCP `apply_migration` prompt when asked again, or
-   - Dashboard → SQL Editor → paste and run `supabase/migrations/20261114120000_clubfund_wallet_links.sql`, then
-     `supabase/migrations/20261114130000_clubfund_campaigns.sql`.
-2. **Deploy the functions** with "Verify JWT" **on**:
-   `supabase functions deploy wallet-challenge wallet-link wallet-unlink campaign-contribute --project-ref zanhvwuvuvfxetqkojbw`
-   (or approve the MCP `deploy_edge_function` prompts). Each bundle needs its `index.ts` plus `_shared/*.ts`.
+1. **Apply the migrations** (done): `npx supabase@2.122.0 db push --dry-run --linked` (lists exactly the two files),
+   then `npx supabase@2.122.0 db push --linked`.
+2. **Deploy the functions** (done) with "Verify JWT" **on**:
+   `npx supabase@2.122.0 functions deploy wallet-challenge wallet-link wallet-unlink campaign-contribute --project-ref zanhvwuvuvfxetqkojbw --use-api`.
+   Redeploy the same way after changing anything under `supabase/functions/`.
 3. **Edge Function secrets** (Dashboard → Edge Functions → Secrets): `CLUBFUND_ALLOWED_ORIGINS` =
    `http://localhost:5173,http://localhost:4173,<your deployed origin>`. Optional: `SOLANA_DEVNET_RPC_URL` for a
    dedicated Devnet RPC (it must be Devnet; the function checks). `SUPABASE_URL` and the secret key are provided by
