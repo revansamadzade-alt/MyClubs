@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, CalendarDays, SearchX } from 'lucide-react';
 import { ApiProblem } from '../../../lib/clubfund/api';
 import { acceptsContributions, getCampaign, listContributions, type Campaign, type Contribution, type RecordedContribution } from '../../../lib/clubfund/campaigns';
-import { readPending } from '../../../lib/clubfund/flow';
+import { readPending, recheckSignature } from '../../../lib/clubfund/flow';
 import { formatSol } from '../../../lib/clubfund/lamports';
 import { canApproveTransactions } from '../../../lib/clubfund/wallets';
 import { EVENT_BY_ID } from '../../../data/events';
@@ -11,7 +11,7 @@ import { EmptyState, SampleBadge } from '../../../components/ui';
 import { useTitle } from '../../../hooks/useTitle';
 import { useClubFund } from './state';
 import { Busy, NotConfigured, Notice, fmtWhen } from './parts';
-import { AddressLink, CampaignStatus, CategoryChip, ContributionList, DevnetNotice, FundingProgress, PUBLIC_CHAIN_NOTE, WalletPanel, useDevnetBalance } from './campaignParts';
+import { AddressLink, CampaignStatus, CategoryChip, ContributionList, DevnetNotice, FundingProgress, PUBLIC_CHAIN_NOTE, TxLink, WalletPanel, useDevnetBalance } from './campaignParts';
 import { ContributeDialog } from './ContributeDialog';
 
 export default function CampaignPage() {
@@ -212,6 +212,9 @@ export default function CampaignPage() {
               Support This Campaign
             </button>
             {gate}
+            {open && cf.link && cf.session && cf.emailAllowed && (
+              <RecheckForm campaign={campaign} wallet={cf.link.wallet_address} userId={cf.session.user.id} onVerified={recorded} />
+            )}
           </div>
           {cf.link && <WalletPanel devnet={devnet} />}
         </aside>
@@ -221,6 +224,69 @@ export default function CampaignPage() {
         <ContributeDialog campaign={campaign} open={!!dialog} resume={dialog.resume} onClose={() => setDialog(null)} onRecorded={recorded} devnet={devnet} />
       )}
     </article>
+  );
+}
+
+/**
+ * Recovery for a contribution whose result was lost (another browser, cleared storage, closed tab): paste the
+ * transaction signature. The server re-verifies it on Devnet (from this student's verified wallet, to this campaign's
+ * recipient, with its memo, counted at most once), so nobody can claim someone else's transaction.
+ */
+function RecheckForm({ campaign, wallet, userId, onVerified }: { campaign: Campaign; wallet: string; userId: string; onVerified: (r: RecordedContribution) => void }) {
+  const [signature, setSignature] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string; signature?: string } | null>(null);
+  const inFlight = useRef(false);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (inFlight.current || !signature.trim()) return;
+    inFlight.current = true;
+    setBusy(true);
+    setResult(null);
+    const r = await recheckSignature({ campaign, signature, wallet, userId });
+    if (r.kind === 'verified') {
+      onVerified(r.result);
+      setResult({
+        ok: true,
+        text: `Verified: ${formatSol(r.result.contribution.lamports)} Devnet SOL ${r.result.created ? 'is now counted' : 'was already counted'}.`,
+        signature: r.result.contribution.signature,
+      });
+      setSignature('');
+    } else setResult({ ok: false, text: r.message });
+    inFlight.current = false;
+    setBusy(false);
+  };
+
+  return (
+    <details className="text-sm" data-testid="cf-recheck">
+      <summary className="cursor-pointer text-link">Contribution didn't finish? Check a transaction</summary>
+      <form onSubmit={submit} className="mt-2 space-y-2" noValidate>
+        <label className="block">
+          <span className="mb-1 block font-bold text-ink">Transaction signature</span>
+          <input
+            className="input font-mono text-xs"
+            value={signature}
+            onChange={(e) => setSignature(e.target.value)}
+            spellCheck={false}
+            autoComplete="off"
+            data-testid="cf-recheck-signature"
+          />
+        </label>
+        <p className="text-xs text-ink-soft">
+          From your wallet's activity or Solana Explorer. Only a transfer from your verified wallet to this campaign's recipient can count, and only once.
+          Nothing is sent.
+        </p>
+        <button type="submit" className="btn btn-secondary btn-sm" disabled={busy || !signature.trim()}>
+          {busy ? 'Checking…' : 'Check transaction'}
+        </button>
+        {result && (
+          <p role={result.ok ? 'status' : 'alert'} className={result.ok ? 'text-success' : 'font-bold text-badge'} data-testid="cf-recheck-result">
+            {result.text} {result.signature && <TxLink signature={result.signature} label="View on Solana Explorer (Devnet)" />}
+          </p>
+        )}
+      </form>
+    </details>
   );
 }
 

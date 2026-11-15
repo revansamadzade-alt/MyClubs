@@ -1,8 +1,9 @@
 // MyClubs end-to-end browser QA: headless Chrome via the DevTools Protocol, no extra dependencies.
 // Usage: start the app (npm run dev), then `npm run test:e2e`.
 // Env: MYCLUBS_BASE_URL (default http://localhost:5173), CHROME_PATH, MYCLUBS_TEST_NOW (default 2026-11-13T12:00:00),
-//      MYCLUBS_TEST_TZ (default America/New_York). The page clock is fixed so results do not depend on today's date.
-import { spawn } from 'node:child_process';
+//      MYCLUBS_TEST_TZ (default America/New_York), MYCLUBS_CLUBFUND_PREVIEW=1 (run the ClubFund section against a
+//      production build served by vite preview instead of the dev server). The page clock is fixed so results do not depend on today's date.
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -659,6 +660,8 @@ await section('15 Find My Fit', async () => {
   const firstFit = await ev(`return $$('article', ${group('fits')}.closest('section'))[0]?.textContent ?? ''`);
   check('F Fit', 'interest match ranks first + labeled', firstFit.includes('Sports & Recreation') && firstFit.includes('Matches your interests'), firstFit.slice(0, 80));
   await reload();
+  // The interest buttons render once Find My Fit has loaded its data; wait for them instead of racing the reload.
+  await waitFor(`byText('[aria-labelledby="interests-label"] button', 'Sports & Recreation')`, 8000);
   check('F Fit', 'interests persist after refresh', (await ev(`return byText('[aria-labelledby="interests-label"] button', 'Sports & Recreation').getAttribute('aria-pressed')`)) === 'true');
 
   // Follow a compatible club from Find My Fit → updates everywhere
@@ -1537,11 +1540,17 @@ await section('25 ClubFund', async () => {
   // A second copy of the app with ClubFund pointed at a mocked, same-origin Supabase.
   const CF_PORT = 5175;
   const CF = `http://localhost:${CF_PORT}`;
-  const server = spawn(process.execPath, [fileURLToPath(new URL('../../node_modules/vite/bin/vite.js', import.meta.url)), '--port', String(CF_PORT), '--strictPort'], {
-    cwd: fileURLToPath(new URL('../..', import.meta.url)),
-    env: { ...process.env, VITE_SUPABASE_URL: `${CF}/__supabase`, VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test_only', VITE_SOLANA_DEVNET_RPC_URL: `${CF}/__devnet` },
-    stdio: 'ignore',
-  });
+  const viteBin = fileURLToPath(new URL('../../node_modules/vite/bin/vite.js', import.meta.url));
+  const appRoot = fileURLToPath(new URL('../..', import.meta.url));
+  const cfEnv = { ...process.env, VITE_SUPABASE_URL: `${CF}/__supabase`, VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test_only', VITE_SOLANA_DEVNET_RPC_URL: `${CF}/__devnet` };
+  let server;
+  if (process.env.MYCLUBS_CLUBFUND_PREVIEW === '1') {
+    // The real production bundle (minified, code-split), built against the mocked backend and served by vite preview.
+    const outDir = join(appRoot, 'node_modules', '.cache', 'myclubs-clubfund-preview');
+    const built = spawnSync(process.execPath, [viteBin, 'build', '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'], { cwd: appRoot, env: cfEnv, stdio: 'inherit' });
+    if (built.status !== 0) throw new Error('ClubFund production build failed');
+    server = spawn(process.execPath, [viteBin, 'preview', '--outDir', outDir, '--port', String(CF_PORT), '--strictPort'], { cwd: appRoot, env: cfEnv, stdio: 'ignore' });
+  } else server = spawn(process.execPath, [viteBin, '--port', String(CF_PORT), '--strictPort'], { cwd: appRoot, env: cfEnv, stdio: 'ignore' });
   try {
     for (let i = 0; i < 60; i++) {
       try {
@@ -1559,7 +1568,7 @@ await section('25 ClubFund', async () => {
       const jwt = `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: USER_ID, email: user.email, role: 'authenticated', aud: 'authenticated', iat, exp: iat + 7 * 86400, amr: [{ method: 'otp', timestamp: iat }] })}.test-signature`;
       return { access_token: jwt, token_type: 'bearer', expires_in: 7 * 86400, expires_at: iat + 7 * 86400, refresh_token: `refresh-${iat}`, user };
     };
-    const mock = { otp: 200, linked: null, challenge: null, failLink: null, requests: [], unlink: [], contributions: [], contributeCalls: [], verify: 'ok', campaignsMissing: false };
+    const mock = { otp: 200, linked: null, challenge: null, challengeLimit: false, failLink: null, requests: [], unlink: [], contributions: [], contributeCalls: [], verify: 'ok', campaignsMissing: false };
     // Demo campaigns as the database would return them (mocked). Recipients are deterministic test keys.
     const R_EQUIP = base58.encode(new Uint8Array(32).fill(9));
     const R_EVENT = base58.encode(new Uint8Array(32).fill(10));
@@ -1596,6 +1605,33 @@ await section('25 ClubFund', async () => {
           if (dn.send === 'drop') return call('Fetch.failRequest', { requestId: p.requestId, errorReason: 'ConnectionReset' });
           result = base58.encode(sentTx.subarray(1, 65));
         }
+      } else if (body.method === 'getTransaction') {
+        const raw = dn.sent.find((t) => base58.encode(t.subarray(1, 65)) === body.params[0]);
+        if (!raw) result = null;
+        else {
+          const tx = readSent(raw);
+          const lamports = Number(tx.lamports);
+          result = {
+            slot: 5,
+            blockTime: 1794571200,
+            meta: { err: null, fee: 5000, preBalances: [2_000_000_000, 0, 1, 1], postBalances: [2_000_000_000 - lamports - 5000, lamports, 1, 1] },
+            transaction: {
+              signatures: [tx.signature],
+              message: {
+                accountKeys: [
+                  { pubkey: tx.from, signer: true, writable: true },
+                  { pubkey: tx.to, signer: false, writable: true },
+                  { pubkey: '11111111111111111111111111111111', signer: false, writable: false },
+                  { pubkey: 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr', signer: false, writable: false },
+                ],
+                instructions: [
+                  { programId: '11111111111111111111111111111111', program: 'system', parsed: { type: 'transfer', info: { source: tx.from, destination: tx.to, lamports } } },
+                  { programId: 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr', program: 'spl-memo', parsed: tx.memo },
+                ],
+              },
+            },
+          };
+        }
       } else if (body.method === 'getSignatureStatuses')
         result = { ...ctx, value: [dn.status === 'none' ? null : { slot: 5, confirmations: 1, err: dn.status === 'failed' ? { InstructionError: [0, { Custom: 1 }] } : null, confirmationStatus: dn.status === 'failed' ? 'confirmed' : dn.status }] };
       else error = { code: -32601, message: 'Method not found' };
@@ -1628,6 +1664,8 @@ await section('25 ClubFund', async () => {
       else if (path === '/auth/v1/token') json = session();
       else if (path.startsWith('/auth/v1/logout')) [status, json] = [204, null];
       else if (path === '/rest/v1/wallet_links') json = mock.linked ? [mock.linked] : [];
+      else if (path === '/functions/v1/wallet-challenge' && mock.challengeLimit)
+        [status, json] = [429, { error: { code: 'rate_limited', message: 'Too many wallet verification requests. Wait a few minutes and try again.', retryAfterSeconds: 125 } }];
       else if (path === '/functions/v1/wallet-challenge') {
         mock.challenge = {
           challengeId: '0b5d7a8c-2222-4d3e-8f1a-9c0b1d2e3f40',
@@ -1637,7 +1675,8 @@ await section('25 ClubFund', async () => {
         json = mock.challenge;
       } else if (path === '/functions/v1/wallet-link') {
         const signed = Buffer.from(body.signedMessage, 'base64').toString('utf8');
-        if (mock.failLink) [status, json] = [409, { error: { code: mock.failLink, message: 'This wallet is already linked to another MyClubs account.' } }];
+        if (mock.failLink === 'challenge_expired') [status, json] = [410, { error: { code: 'challenge_expired', message: 'That verification request expired. Start again.' } }];
+        else if (mock.failLink) [status, json] = [409, { error: { code: mock.failLink, message: 'This wallet is already linked to another MyClubs account.' } }];
         else if (signed !== mock.challenge?.message) [status, json] = [400, { error: { code: 'message_mismatch', message: 'The signed message does not match the verification request. Start again.' } }];
         else {
           mock.linked = { wallet_address: body.wallet, chain: 'solana:devnet', linked_at: '2026-11-13T17:05:00Z', verified_at: '2026-11-13T17:05:00Z' };
@@ -1661,6 +1700,7 @@ await section('25 ClubFund', async () => {
         mock.contributeCalls.push(body);
         const k = mock.campaigns.find((x) => x.id === body.campaignId);
         if (mock.verify === 'delay') [status, json] = [404, { error: { code: 'tx_not_found', message: 'The transaction was not found on Solana Devnet yet.' } }];
+        else if (mock.verify === 'ratelimit') [status, json] = [429, { error: { code: 'verify_rate_limited', message: 'Too many contribution checks. Wait a few minutes, then check again.', retryAfterSeconds: 180 } }];
         else if (mock.verify === 'refuse') [status, json] = [403, { error: { code: 'wrong_wallet', message: 'The transaction was not sent from your verified linked wallet.' } }];
         else {
           const prior = mock.contributions.find((c) => c.signature === body.signature);
@@ -1701,6 +1741,8 @@ await section('25 ClubFund', async () => {
           'standard:events': { version: '1.0.0', on: () => () => {} },
           'solana:signMessage': { version: '1.0.0', signMessage: async ({ message }) => {
             if (flag('reject') === 'sign') throw Object.assign(new Error('User rejected the request.'), { code: 4001 });
+            if (flag('reject') === 'hang') return new Promise(() => {});
+            if (flag('reject') === 'signfail') throw new Error('Ledger device is locked');
             window.__signed = new TextDecoder().decode(message);
             return [{ signedMessage: message, signature: new Uint8Array(64).fill(7) }];
           } },
@@ -1792,13 +1834,51 @@ await section('25 ClubFund', async () => {
     await evT(`localStorage.setItem('test:reject', 'sign'); return true`);
     await clickT(`byText('main button', 'Sign verification message')`);
     check(A, 'signature rejected: nothing linked', (await waitT(`$('main [role=alert]')?.textContent.includes('You cancelled the signature')`)) && mock.linked === null && !(await evT(`return $('main').textContent.includes('Wallet linked')`)));
-    await evT(`localStorage.removeItem('test:reject'); return true`);
-    mock.failLink = 'wallet_in_use';
+    // Regression for the live lockout: retries must reuse the open challenge, never mint new ones.
+    const challengeRequests = () => mock.requests.filter((r) => r.path === '/functions/v1/wallet-challenge').length;
+    const firstChallenge = challengeRequests();
+    check(A, 'rejected signature: retry hint, the open challenge is kept', firstChallenge === 1 && (await evT(`return $('main [role=alert]').textContent.includes('the same request is reused')`)));
+    await evT(`localStorage.setItem('test:reject', 'hang'); return true`);
     await clickT(`byText('main button', 'Sign verification message')`);
+    check(A, 'wallet popup never answers: Stop waiting is offered', await waitT(`!!byText('main button', 'Stop waiting') && byText('main button', 'Check your wallet').disabled`));
+    await clickT(`byText('main button', 'Stop waiting')`);
+    check(A, 'stopped waiting: button usable again, guidance shown', await waitT(`$('main [role=alert]')?.textContent.includes('Stopped waiting for the wallet') && !byText('main button', 'Sign verification message').disabled`));
+    await evT(`localStorage.setItem('test:reject', 'signfail'); return true`);
+    await clickT(`byText('main button', 'Sign verification message')`);
+    check(A, "wallet error: the wallet's own message is shown for troubleshooting", await waitT(`$('main [role=alert]')?.textContent.includes('Wallet message: Ledger device is locked')`));
+    check(A, 'cancel, stuck popup and wallet error reused one challenge (no new requests)', challengeRequests() === firstChallenge);
+    await evT(`localStorage.removeItem('test:reject'); return true`);
+    await evT(`document.querySelector('[data-testid=cf-connected] button.btn-primary').click(); document.querySelector('[data-testid=cf-connected] button.btn-primary').click(); return true`);
+    await waitT(`!!$('main [role=alert]') || $('main').textContent.includes('Wallet linked')`);
+    check(A, 'double click sends one proof', mock.requests.filter((r) => r.path === '/functions/v1/wallet-link').length === 1);
+    // Server rate limit: countdown, button disabled, survives a reload.
+    mock.linked = null;
+    await go('/clubs/clubfund');
+    await waitT(`!!byText('main button', 'Sign verification message')`);
+    await evT(`sessionStorage.removeItem('myclubs:clubfund:challenge'); return true`);
+    mock.challengeLimit = true;
+    await clickT(`byText('main button', 'Sign verification message')`);
+    check(A, 'rate limited: clear reason, retry time from the server, button disabled', await waitT(`$('main [role=alert]')?.textContent.includes('allows 5 new wallet verification requests per 10 minutes') && /try again in 2:0\\d/.test($('main [role=alert]').textContent) && byText('main button', 'Try again in')?.disabled`));
+    await go('/clubs/clubfund');
+    check(A, 'rate limit wait survives a reload (no repeated requests)', await waitT(`byText('main button', 'Try again in')?.disabled`));
+    mock.challengeLimit = false;
+    await evT(`sessionStorage.removeItem('myclubs:clubfund:retryAt'); return true`);
+    await go('/clubs/clubfund');
+    await waitT(`!!byText('main button', 'Sign verification message')`);
+    mock.failLink = 'challenge_expired';
+    const beforeExpired = challengeRequests();
+    await clickT(`byText('main button', 'Sign verification message')`);
+    check(A, 'expired challenge: clear message, the spent challenge is discarded', (await waitT(`$('main [role=alert]')?.textContent.includes('expired before it was signed')`)) && (await evT(`return sessionStorage.getItem('myclubs:clubfund:challenge') === null`)) && challengeRequests() === beforeExpired + 1);
+    mock.failLink = 'wallet_in_use';
+    const afterExpired = challengeRequests();
+    await clickT(`byText('main button', 'Sign verification message')`);
+    check(A, 'after an expired challenge the next attempt gets a fresh one (exactly one new request)', challengeRequests() === afterExpired + 1);
     check(A, 'server refuses (wallet linked elsewhere): message shown, no success', (await waitT(`$('main [role=alert]')?.textContent.includes('already linked to another')`)) && !(await evT(`return $('main').textContent.includes('Wallet linked')`)));
     mock.failLink = null;
+    const beforeLink = challengeRequests();
     await clickT(`byText('main button', 'Sign verification message')`);
     check(A, 'linked only after server confirmation', await waitT(`$('main').textContent.includes('Wallet linked') && $('main').textContent.includes('Verified by wallet signature')`));
+    check(A, 'retry after a server refusal reused the open challenge; it is cleared once used', challengeRequests() === beforeLink && (await evT(`return sessionStorage.getItem('myclubs:clubfund:challenge') === null`)));
     const signed = await evT(`return window.__signed`);
     check(A, 'wallet signed exactly the server challenge (no email inside)', signed === mock.challenge.message && !signed.includes('@'));
     check(A, 'link calls carry the session token, not a user id', mock.requests.filter((r) => r.path.startsWith('/functions/')).every((r) => /^Bearer /.test(r.auth ?? '') && !('userId' in (r.body ?? {})) && !('email' in (r.body ?? {}))));
@@ -1898,11 +1978,34 @@ await section('25 ClubFund', async () => {
     await clickT(inDlg('Try again'));
     await clickT(inDlg('Approve in wallet'));
     check(X, 'server refuses the transaction: shown as not counted', (await waitT(`$('[data-testid=cf-result]')?.dataset.kind === 'refused' && ${dlg}.textContent.includes('Not counted')`)) && mock.contributions.length === 1);
+    const refusedSig = base58.encode(dn.sent.at(-1).subarray(1, 65));
     mock.verify = 'ok';
     await t.call('Accessibility.enable');
     const ax = (await t.call('Accessibility.getFullAXTree')).result.nodes.filter((x) => !x.ignored && ['button', 'link', 'textbox', 'checkbox'].includes(x.role?.value) && !(x.name?.value ?? '').trim());
     check(X, 'contribution dialog and campaign page: every control has an accessible name', ax.length === 0, ax.map((x) => x.role.value).join(','));
     await clickT(inDlg('Close'));
+
+    // Recovery by transaction signature (another browser, cleared storage). Server-verified; nothing is sent.
+    const recheck = async (sig) => {
+      await evT(`const d = $('[data-testid=cf-recheck]'); d.open = true; typeInto($('[data-testid=cf-recheck-signature]'), ${JSON.stringify(sig)}); return true`);
+      await clickT(`byText('[data-testid=cf-recheck] button', 'Check transaction')`);
+      await waitT(`!!$('[data-testid=cf-recheck-result]') && !byText('[data-testid=cf-recheck] button', 'Checking')`, 20000);
+      return evT(`return $('[data-testid=cf-recheck-result]').textContent`);
+    };
+    const sentBefore = dn.sent.length;
+    const callsBefore = mock.contributeCalls.length;
+    check(X, 'recheck: malformed signature refused before any request', (await recheck('not-a-signature')).includes("isn't a Solana transaction signature") && mock.contributeCalls.length === callsBefore);
+    check(X, 'recheck: unknown signature (invented or not on Devnet) is not counted', (await recheck('5'.repeat(88))).includes('no confirmed transaction with that signature') && mock.contributeCalls.length === callsBefore);
+    mock.verify = 'ratelimit';
+    check(X, 'recheck: server rate limit is reported with the wait, not retried in a loop', (await recheck(refusedSig)).includes('Check again in about 3 minutes') && mock.contributeCalls.length === callsBefore + 1 && mock.contributions.length === 1);
+    mock.verify = 'delay';
+    check(X, 'recheck: server cannot verify yet: retried, then reported, nothing counted', (await recheck(refusedSig)).includes('not found on Solana Devnet yet') && mock.contributeCalls.length === callsBefore + 3 && mock.contributions.length === 1);
+    mock.verify = 'ok';
+    const rechecked = await recheck(refusedSig);
+    check(X, 'recheck: verified by the server and counted once, with an Explorer link', rechecked.includes('Verified: 0.01 Devnet SOL is now counted') && mock.contributions.length === 2 && (await evT(`return $('[data-testid=cf-raised]').textContent === '0.06' && $$('[data-testid=cf-recheck-result] a').some((a) => a.href === 'https://explorer.solana.com/tx/${refusedSig}?cluster=devnet')`)));
+    check(X, 'recheck: the server was asked with the on-chain amount in integer lamports', mock.contributeCalls.at(-1).signature === refusedSig && mock.contributeCalls.at(-1).lamports === 10_000_000);
+    check(X, 'recheck: the same signature again is not counted twice', (await recheck(refusedSig)).includes('was already counted') && mock.contributions.length === 2 && (await evT(`return $('[data-testid=cf-raised]').textContent === '0.06'`)));
+    check(X, 'recheck never sends a transaction', dn.sent.length === sentBefore);
 
     await go('/clubs/clubfund');
     check(X, 'my verified contributions: amount, campaign, status and Explorer link', await waitT(`(() => { const h = $('#cf-mine')?.parentElement.querySelector('[data-testid=cf-history]'); return !!h && h.textContent.includes('0.05 Devnet SOL') && h.textContent.includes('Demo Club: Equipment & Supplies') && h.textContent.includes('Verified') && $$('a', h).some((a) => a.href.includes('/tx/') && a.href.endsWith('?cluster=devnet')); })()`));

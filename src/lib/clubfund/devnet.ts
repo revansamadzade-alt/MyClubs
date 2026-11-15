@@ -1,7 +1,7 @@
 // Solana Devnet JSON-RPC from the browser: network check, balances, blockhashes, fees, sending and confirmation.
 // Every connection is checked against the Devnet genesis hash first; there is no Mainnet endpoint anywhere.
 import { toBase64 } from '../../../supabase/functions/_shared/policy';
-import { DEFAULT_DEVNET_RPC_URL, DEVNET_GENESIS_HASH, type SignatureStatus } from '../../../supabase/functions/_shared/solana';
+import { DEFAULT_DEVNET_RPC_URL, DEVNET_GENESIS_HASH, type ParsedTransaction, type SignatureStatus } from '../../../supabase/functions/_shared/solana';
 
 const RPC_URL = (import.meta.env.VITE_SOLANA_DEVNET_RPC_URL as string | undefined) || DEFAULT_DEVNET_RPC_URL;
 
@@ -19,7 +19,7 @@ const UNAVAILABLE = "Can't reach Solana Devnet right now. Check your connection 
 const RATE_LIMITED = 'Solana Devnet is rate-limiting requests. Wait a moment and try again.';
 
 /** Read-only methods: safe to repeat and to share between callers. sendTransaction is never repeated. */
-const READS = new Set(['getGenesisHash', 'getBalance', 'getLatestBlockhash', 'getFeeForMessage', 'getMinimumBalanceForRentExemption', 'getBlockHeight', 'getSignatureStatuses']);
+const READS = new Set(['getGenesisHash', 'getBalance', 'getLatestBlockhash', 'getFeeForMessage', 'getMinimumBalanceForRentExemption', 'getBlockHeight', 'getSignatureStatuses', 'getTransaction']);
 const READ_ATTEMPTS = 3;
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -195,4 +195,10 @@ export async function waitForConfirmation(
     await sleep(errors ? Math.min(intervalMs * 2 ** errors, 10_000) : intervalMs);
   }
   return 'unknown';
+}
+
+/** A confirmed transaction in parsed form (null if Devnet doesn't have it). */
+export async function getParsedTransaction(signature: string): Promise<ParsedTransaction | null> {
+  await ensureDevnet();
+  return rpc<ParsedTransaction | null>('getTransaction', [signature, { encoding: 'jsonParsed', commitment: 'confirmed', maxSupportedTransactionVersion: 0 }]);
 }

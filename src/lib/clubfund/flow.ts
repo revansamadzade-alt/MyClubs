@@ -4,10 +4,10 @@
 // signature is saved first, so its status can always be checked instead.
 import { ApiProblem } from './api';
 import { submitContribution, type Campaign, type RecordedContribution } from './campaigns';
-import { RpcProblem, ensureDevnet, getLatestBlockhash, sendSignedTransaction, waitForConfirmation, type Confirmation } from './devnet';
+import { RpcProblem, ensureDevnet, getLatestBlockhash, getParsedTransaction, sendSignedTransaction, waitForConfirmation, type Confirmation } from './devnet';
 import { buildTransferMessage, readSignedTransaction, unsignedTransaction } from './transfer';
 import { WalletProblem, approveTransaction, type Wallet, type WalletAccount } from './wallets';
-import { campaignMemo } from '../../../supabase/functions/_shared/solana';
+import { campaignMemo, looksLikeTxSignature, transferredLamports, type ParsedTransaction } from '../../../supabase/functions/_shared/solana';
 
 export type Phase = 'preparing' | 'wallet' | 'sending' | 'confirming' | 'verifying';
 
@@ -61,6 +61,7 @@ export const savePending = (p: Pending) => writePending([...readPending().filter
 export const clearPending = (signature: string) => writePending(readPending().filter((x) => x.signature !== signature));
 
 const RETRYABLE = new Set(['tx_not_found', 'tx_not_confirmed', 'rpc_unavailable', 'network']);
+const KEEP_PENDING = new Set(['server_error', 'not_deployed', 'origin_blocked', 'wrong_network']);
 
 /** Server verification, re-asked a few times while Devnet's view catches up. Never re-sends anything. */
 export async function verifyContribution(
@@ -77,7 +78,17 @@ export async function verifyContribution(
       const p = e instanceof ApiProblem ? e : new ApiProblem('server_error', 'Something went wrong on our side.');
       if (!RETRYABLE.has(p.code)) {
         if (p.code === 'not_signed_in') return { kind: 'verify_delayed', signature: pending.signature, message: 'Your session ended. Verify your UMass email again, then check this contribution.' };
-        if (p.code !== 'server_error' && p.code !== 'not_deployed') clearPending(pending.signature);
+        if (p.code === 'verify_rate_limited') {
+          const mins = Math.max(1, Math.ceil((p.retryAfter ?? 600) / 60));
+          return {
+            kind: 'verify_delayed',
+            signature: pending.signature,
+            message: `ClubFund limits how often contributions are checked. Check again in about ${mins} minute${mins === 1 ? '' : 's'}. Nothing will be sent again.`,
+          };
+        }
+        // Our side or the connection failed: keep it saved and checkable; nothing about the transaction is wrong.
+        if (KEEP_PENDING.has(p.code)) return { kind: 'verify_delayed', signature: pending.signature, message: `${p.message} The transaction is saved; check again in a moment.` };
+        clearPending(pending.signature);
         return { kind: 'refused', signature: pending.signature, code: p.code, message: p.message };
       }
       last = p;
@@ -195,4 +206,32 @@ export async function contribute(a: {
 
   a.onPhase('verifying');
   return verifyContribution(pending);
+}
+
+export type RecheckResult = { kind: 'verified'; result: RecordedContribution } | { kind: 'problem'; message: string };
+
+/**
+ * Recovery for a contribution whose result was lost (another browser, cleared storage): the student pastes the
+ * transaction signature. The amount is read from Devnet, then the server verifies everything itself (sender = this
+ * student's verified wallet, recipient, memo, confirmation, not counted before), so an unrelated signature can't be
+ * claimed.
+ */
+export async function recheckSignature(a: { campaign: Campaign; signature: string; wallet: string; userId: string }): Promise<RecheckResult> {
+  const signature = a.signature.trim();
+  if (!looksLikeTxSignature(signature)) return { kind: 'problem', message: "That isn't a Solana transaction signature (it is about 88 letters and digits)." };
+  if (!a.campaign.recipient_address) return { kind: 'problem', message: 'This campaign has no confirmed recipient.' };
+  let tx: ParsedTransaction | null;
+  try {
+    tx = await getParsedTransaction(signature);
+  } catch (e) {
+    return { kind: 'problem', message: e instanceof RpcProblem ? e.message : "Can't reach Solana Devnet right now." };
+  }
+  if (!tx) return { kind: 'problem', message: 'Solana Devnet has no confirmed transaction with that signature yet. Check it, or wait a few seconds and try again.' };
+  const lamports = transferredLamports(tx, a.wallet, a.campaign.recipient_address);
+  if (!lamports) return { kind: 'problem', message: "That transaction didn't send Devnet SOL from your verified wallet to this campaign's recipient." };
+  const out = await verifyContribution(
+    { signature, campaignId: a.campaign.id, slug: a.campaign.slug, lamports, lastValidBlockHeight: 0, userId: a.userId, startedAt: new Date().toISOString() },
+    { attempts: 2 },
+  );
+  return out.kind === 'verified' ? { kind: 'verified', result: out.result } : { kind: 'problem', message: 'message' in out ? out.message : 'It could not be verified.' };
 }

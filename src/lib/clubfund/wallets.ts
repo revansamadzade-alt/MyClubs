@@ -50,10 +50,15 @@ export class WalletProblem extends Error {
   constructor(
     public code: 'rejected' | 'no_account' | 'unsupported' | 'failed',
     message: string,
+    /** The wallet's own error text, for troubleshooting (never contains keys). */
+    public detail?: string,
   ) {
     super(message);
   }
 }
+
+/** A short, single-line version of the wallet's error message. */
+const walletSaid = (msg: string) => msg.replace(/\s+/g, ' ').trim().slice(0, 160) || undefined;
 
 function explain(e: unknown, action: 'connect' | 'sign' | 'transaction'): WalletProblem {
   const msg = e instanceof Error ? e.message : String(e);
@@ -66,14 +71,16 @@ function explain(e: unknown, action: 'connect' | 'sign' | 'transaction'): Wallet
         : action === 'sign'
           ? 'You cancelled the signature in your wallet. Nothing was linked.'
           : 'You declined the transaction in your wallet. Nothing was sent.',
+      walletSaid(msg),
     );
   return new WalletProblem(
     'failed',
     action === 'connect'
       ? "The wallet didn't connect. Unlock it and try again."
       : action === 'sign'
-        ? "The wallet couldn't sign the message. Try again."
+        ? "The wallet couldn't sign the message. Unlock it, check it's on the account shown here, and try again."
         : "The wallet couldn't sign the transaction. Nothing was sent.",
+    walletSaid(msg),
   );
 }
 

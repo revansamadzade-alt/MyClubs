@@ -184,3 +184,15 @@ export async function rpcRead<T>(
     await sleep(Math.min(retryAfterMs ?? 300 * 2 ** i + random() * 200, opts.maxDelayMs ?? 2_000));
   }
 }
+
+/** Lamports a transaction moved from `from` to `to` in top-level System transfers (0 if none). */
+export function transferredLamports(tx: ParsedTransaction | null, from: string, to: string): number {
+  if (!tx) return 0;
+  let total = 0;
+  for (const ix of tx.transaction.message.instructions) {
+    const p = ix.parsed as { type?: string; info?: { source?: unknown; destination?: unknown; lamports?: unknown } } | undefined;
+    if (ix.programId === SYSTEM_PROGRAM_ID && p?.type === 'transfer' && p.info?.source === from && p.info?.destination === to && Number.isSafeInteger(p.info?.lamports))
+      total += p.info.lamports as number;
+  }
+  return total;
+}

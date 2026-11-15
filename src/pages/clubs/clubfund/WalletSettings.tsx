@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BadgeCheck, TriangleAlert } from 'lucide-react';
-import { ApiProblem, requestChallenge, unlinkAfterRecentSignIn, unlinkWithSignature } from '../../../lib/clubfund/api';
-import { WalletProblem, shortAddress, signMessage } from '../../../lib/clubfund/wallets';
+import { ApiProblem, unlinkAfterRecentSignIn, unlinkWithSignature } from '../../../lib/clubfund/api';
+import { WalletProblem, shortAddress } from '../../../lib/clubfund/wallets';
 import { PageHeader } from '../../../components/ui';
 import { useTitle } from '../../../hooks/useTitle';
 import { useClubFund } from './state';
 import { Busy, EmailVerification, NotConfigured, Notice, PRIVACY_STATEMENT, WalletPicker, fmtWhen } from './parts';
 import { DevnetBalanceCard, PUBLIC_CHAIN_NOTE } from './campaignParts';
+import { ProofFeedback, proofButtonLabel, useWalletProof } from './useWalletProof';
 
 function Unlink() {
   const cf = useClubFund();
@@ -30,11 +31,11 @@ function Unlink() {
     }
   };
 
+  const proof = useWalletProof('unlink');
   const withSignature = () =>
-    run(async () => {
-      const ch = await requestChallenge(link.wallet_address, 'unlink');
-      const { signedMessage, signature } = await signMessage(cf.wallet!, cf.account!, new TextEncoder().encode(ch.message));
-      await unlinkWithSignature({ challengeId: ch.challengeId, wallet: link.wallet_address, signedMessage, signature });
+    void proof.run(link.wallet_address, async (p) => {
+      await unlinkWithSignature(p);
+      cf.setLink(null); // the server confirmed the association was deleted
     });
 
   return (
@@ -47,8 +48,8 @@ function Unlink() {
         the linked wallet.
       </p>
       {matches ? (
-        <button type="button" className="btn btn-secondary mt-3" onClick={withSignature} disabled={busy}>
-          {busy ? 'Unlinking…' : 'Sign and unlink'}
+        <button type="button" className="btn btn-secondary mt-3" onClick={withSignature} disabled={busy || proof.working || proof.waitSeconds > 0}>
+          {proofButtonLabel(proof, 'Sign and unlink')}
         </button>
       ) : (
         <p className="mt-3 text-sm text-ink-soft">Connect the linked wallet ({shortAddress(link.wallet_address)}) in this browser to unlink with a signature.</p>
@@ -68,6 +69,7 @@ function Unlink() {
           </div>
         )}
       </div>
+      <ProofFeedback proof={proof} />
       {busy && <Busy label="Unlinking…" />}
       {error && (
         <p role="alert" className="mt-2 text-sm font-bold text-badge">

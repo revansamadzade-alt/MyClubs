@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BadgeCheck, MailCheck, PenLine, Wallet as WalletIcon } from 'lucide-react';
-import { requestChallenge, submitLink, ApiProblem } from '../../../lib/clubfund/api';
+import { submitLink, ApiProblem } from '../../../lib/clubfund/api';
 import { CATEGORY_LABEL, listCampaigns, listMyContributions, type Campaign, type CampaignCategory, type MyContribution } from '../../../lib/clubfund/campaigns';
 import { readPending } from '../../../lib/clubfund/flow';
 import { formatSol } from '../../../lib/clubfund/lamports';
-import { WalletProblem, shortAddress, signMessage } from '../../../lib/clubfund/wallets';
+import { shortAddress } from '../../../lib/clubfund/wallets';
 import { ChipGroup, PageHeader } from '../../../components/ui';
 import { useTitle } from '../../../hooks/useTitle';
 import { cx } from '../../../lib/cx';
 import { useClubFund } from './state';
 import { Busy, EmailVerification, NotConfigured, Notice, PRIVACY_STATEMENT, WalletPicker, fmtWhen } from './parts';
 import { CampaignCard, ContributionList, DevnetNotice, PUBLIC_CHAIN_NOTE, WalletPanel, useDevnetBalance } from './campaignParts';
+import { ProofFeedback, proofButtonLabel, useWalletProof } from './useWalletProof';
 
 const SSO_NOTE =
   'Verifying your email proves you can open that @umass.edu inbox. It is not UMass single sign-on and does not confirm current enrollment.';
@@ -60,28 +61,15 @@ function About() {
 
 function LinkWallet() {
   const cf = useClubFund();
-  const [phase, setPhase] = useState<'idle' | 'challenge' | 'signing' | 'verifying'>('idle');
-  const [error, setError] = useState('');
-
-  const sign = async () => {
-    if (!cf.wallet || !cf.account) return;
-    setError('');
-    try {
-      setPhase('challenge');
-      const ch = await requestChallenge(cf.account.address, 'link');
-      setPhase('signing');
-      const { signedMessage, signature } = await signMessage(cf.wallet, cf.account, new TextEncoder().encode(ch.message));
-      setPhase('verifying');
-      const { link } = await submitLink({ challengeId: ch.challengeId, wallet: cf.account.address, signedMessage, signature });
+  const proof = useWalletProof('link');
+  const sign = () => {
+    if (!cf.account) return;
+    void proof.run(cf.account.address, async (p) => {
+      const { link } = await submitLink(p);
       cf.setLink(link); // shown only after the server verified the signature and stored the link
-    } catch (e) {
-      setError(e instanceof ApiProblem || e instanceof WalletProblem ? e.message : 'Something went wrong. Try again.');
-    } finally {
-      setPhase('idle');
-    }
+    });
   };
-
-  const working = phase !== 'idle';
+  const working = proof.working;
   return (
     <>
       <Steps current={cf.wallet ? 3 : 2} />
@@ -112,8 +100,8 @@ function LinkWallet() {
               <span className="sr-only"> (full address {cf.account.address})</span>
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" className="btn btn-primary" onClick={sign} disabled={working}>
-                {phase === 'challenge' ? 'Preparing message…' : phase === 'signing' ? 'Check your wallet…' : phase === 'verifying' ? 'Verifying signature…' : 'Sign verification message'}
+              <button type="button" className="btn btn-primary" onClick={sign} disabled={working || proof.waitSeconds > 0}>
+                {proofButtonLabel(proof, 'Sign verification message')}
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => void cf.disconnect()} disabled={working}>
                 Cancel
@@ -121,12 +109,7 @@ function LinkWallet() {
             </div>
           </div>
         )}
-        {working && <Busy label={phase === 'signing' ? 'Waiting for your wallet to sign…' : 'Talking to ClubFund…'} />}
-        {error && (
-          <p role="alert" className="text-sm font-bold text-badge">
-            {error}
-          </p>
-        )}
+        <ProofFeedback proof={proof} />
       </section>
     </>
   );
