@@ -7,7 +7,7 @@ export default defineConfig({
   // ClubFund's dependencies are only reached through a lazy route; pre-bundle them at dev-server start so the first
   // visit doesn't trigger a dependency re-optimization and full page reload.
   optimizeDeps: {
-    include: ['@supabase/supabase-js', '@wallet-standard/app', '@wallet-standard/features', '@solana/wallet-standard-features'],
+    include: ['@supabase/supabase-js', '@wallet-standard/app', '@wallet-standard/features', '@solana/wallet-standard-features', '@scure/base'],
   },
   build: {
     rollupOptions: {

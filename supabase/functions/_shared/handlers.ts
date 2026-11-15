@@ -79,6 +79,21 @@ const MESSAGES: Record<string, string> = {
   signature_invalid: 'The wallet signature could not be verified. Start again.',
   recent_sign_in_required: 'For your security, verify your UMass email again (within the last 10 minutes) to unlink without your wallet.',
   server_error: 'Something went wrong on our side. Try again.',
+  // Contributions
+  campaign_not_found: 'That campaign was not found.',
+  campaign_unavailable: 'This campaign is not accepting Devnet contributions right now.',
+  invalid_amount: 'Enter an amount between 0.001 and 2 Devnet SOL.',
+  invalid_signature: 'That is not a valid Solana transaction signature.',
+  duplicate_signature: 'This transaction has already been counted.',
+  tx_not_found: 'The transaction was not found on Solana Devnet yet.',
+  tx_not_confirmed: 'The transaction is not confirmed on Solana Devnet yet.',
+  tx_failed: 'The transaction failed on Solana Devnet, so nothing was counted.',
+  wrong_wallet: 'The transaction was not sent from your verified linked wallet.',
+  wrong_recipient: "The transaction did not pay this campaign's recipient address.",
+  amount_mismatch: 'The amount on the blockchain does not match this contribution.',
+  campaign_mismatch: 'The transaction is not marked for this campaign.',
+  rpc_unavailable: "Can't reach Solana Devnet right now. Try checking again in a moment.",
+  wrong_network: 'The server is not connected to Solana Devnet.',
 };
 
 const STATUS: Record<string, number> = {
@@ -103,9 +118,23 @@ const STATUS: Record<string, number> = {
   signature_invalid: 422,
   recent_sign_in_required: 401,
   server_error: 500,
+  campaign_not_found: 404,
+  campaign_unavailable: 409,
+  invalid_amount: 400,
+  invalid_signature: 400,
+  duplicate_signature: 409,
+  tx_not_found: 404,
+  tx_not_confirmed: 409,
+  tx_failed: 422,
+  wrong_wallet: 403,
+  wrong_recipient: 422,
+  amount_mismatch: 422,
+  campaign_mismatch: 422,
+  rpc_unavailable: 503,
+  wrong_network: 500,
 };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function corsHeaders(origin: string | null, allowed: string[]): Record<string, string> {
   const h: Record<string, string> = { Vary: 'Origin' };
@@ -118,10 +147,10 @@ function corsHeaders(origin: string | null, allowed: string[]): Record<string, s
   return h;
 }
 
-function json(body: unknown, status: number, cors: Record<string, string>): Response {
+export function json(body: unknown, status: number, cors: Record<string, string>): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
-const fail = (code: string, cors: Record<string, string>) => json({ error: { code, message: MESSAGES[code] ?? MESSAGES.server_error } }, STATUS[code] ?? 500, cors);
+export const fail = (code: string, cors: Record<string, string>) => json({ error: { code, message: MESSAGES[code] ?? MESSAGES.server_error } }, STATUS[code] ?? 500, cors);
 
 async function readJson(req: Request): Promise<Record<string, unknown> | null> {
   const len = Number(req.headers.get('content-length') ?? 0);
@@ -136,9 +165,20 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
   }
 }
 
-const storeCode = (e: unknown) => (e instanceof StoreError ? e.message : 'server_error');
+export const storeCode = (e: unknown) => (e instanceof StoreError ? e.message : 'server_error');
 
-export async function handle(endpoint: Endpoint, req: Request, deps: Deps): Promise<Response> {
+export interface Guarded {
+  user: AuthedUser;
+  body: Record<string, unknown>;
+  cors: Record<string, string>;
+  origin: string | null;
+}
+
+/**
+ * The checks every ClubFund function runs first: allowed origin, CORS preflight, POST only, a valid session for a
+ * confirmed @umass.edu address, and a small JSON body. Returns the response to send when a check fails.
+ */
+export async function guard(req: Request, deps: Pick<Deps, 'authenticate' | 'allowedOrigins'>): Promise<Response | Guarded> {
   const origin = req.headers.get('origin');
   const cors = corsHeaders(origin, deps.allowedOrigins);
   // Browsers always send Origin on cross-origin requests; refuse sites that are not on the allow list.
@@ -154,6 +194,13 @@ export async function handle(endpoint: Endpoint, req: Request, deps: Deps): Prom
 
   const body = await readJson(req);
   if (!body) return fail('bad_request', cors);
+  return { user, body, cors, origin };
+}
+
+export async function handle(endpoint: Endpoint, req: Request, deps: Deps): Promise<Response> {
+  const g = await guard(req, deps);
+  if (g instanceof Response) return g;
+  const { user, body, cors, origin } = g;
 
   try {
     if (endpoint === 'challenge') return await challenge(body, user, deps, cors, origin);
